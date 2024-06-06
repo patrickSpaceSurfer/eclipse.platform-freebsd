@@ -13,6 +13,9 @@
  *******************************************************************************/
 package org.eclipse.core.tests.runtime.jobs;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -21,15 +24,16 @@ import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.jobs.IJobChangeEvent;
 import org.eclipse.core.runtime.jobs.JobChangeAdapter;
 import org.eclipse.core.tests.harness.TestJob;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Regression test for bug 550738.
  *
  * Job should not start after cancel() if no schedule() is called after it. Job
  * should start after schedule() if no cancel() is called after it.
- *
  */
-public class Bug_550738 extends AbstractJobManagerTest {
+public class Bug_550738 extends AbstractJobTest {
 	private static final class BusyLoopJob extends TestJob {
 		public Runnable started = () -> {
 		};
@@ -66,14 +70,14 @@ public class Bug_550738 extends AbstractJobManagerTest {
 		}
 	}
 
-	@Override
-	protected void setUp() throws Exception {
-		super.setUp();
+	@BeforeEach
+	public void removeProgressProvider() throws Exception {
 		// don't use fussy progress monitor, because in this test we may kill
 		// a job before it has started running
 		manager.setProgressProvider(null);
 	}
 
+	@Test
 	public void testCancelSchedule() throws InterruptedException {
 		BusyLoopJob job = new BusyLoopJob();
 		try {
@@ -104,6 +108,7 @@ public class Bug_550738 extends AbstractJobManagerTest {
 		}
 	}
 
+	@Test
 	public void testReportDoneOncePerSchedule() throws InterruptedException {
 		BusyLoopJob job = new BusyLoopJob();
 		EventCount eventCount = new EventCount();

@@ -13,12 +13,30 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.regression;
 
-import org.eclipse.core.resources.*;
-import org.eclipse.core.runtime.*;
-import org.eclipse.core.tests.resources.ResourceTest;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+import static org.junit.Assert.assertTrue;
 
-public class Bug_231301 extends ResourceTest {
-	public void testBug() throws CoreException {
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IResourceChangeEvent;
+import org.eclipse.core.resources.IResourceChangeListener;
+import org.eclipse.core.resources.IWorkspace;
+import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.resources.WorkspaceJob;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Rule;
+import org.junit.Test;
+
+public class Bug_231301 {
+
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
+
+	@Test
+	public void testBug() throws CoreException, InterruptedException {
 		IWorkspace workspace = ResourcesPlugin.getWorkspace();
 		final IProject project1 = workspace.getRoot().getProject("Project1");
 		project1.create(null);
@@ -50,14 +68,12 @@ public class Bug_231301 extends ResourceTest {
 				}
 			}
 		};
-		workspace.addResourceChangeListener(projectClosingChangeListener, IResourceChangeEvent.PRE_CLOSE);
 
 		try {
+			workspace.addResourceChangeListener(projectClosingChangeListener, IResourceChangeEvent.PRE_CLOSE);
 			// close project
-			project1.close(getMonitor());
+			project1.close(createTestMonitor());
 			job.join();
-		} catch (InterruptedException e) {
-			fail("1.0", e);
 		} finally {
 			workspace.removeResourceChangeListener(projectClosingChangeListener);
 		}
@@ -66,4 +82,5 @@ public class Bug_231301 extends ResourceTest {
 		assertTrue("3.0", !project1.isOpen());
 		assertTrue("4.0", !project2.isOpen());
 	}
+
 }

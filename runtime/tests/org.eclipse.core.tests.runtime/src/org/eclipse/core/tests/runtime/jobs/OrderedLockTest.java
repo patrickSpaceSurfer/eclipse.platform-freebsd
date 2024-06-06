@@ -13,10 +13,13 @@
  *******************************************************************************/
 package org.eclipse.core.tests.runtime.jobs;
 
+import static java.util.function.Predicate.not;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -30,17 +33,14 @@ import org.eclipse.core.runtime.jobs.ILock;
 import org.eclipse.core.runtime.jobs.LockListener;
 import org.eclipse.core.tests.harness.TestBarrier2;
 import org.eclipse.core.tests.runtime.jobs.LockAcquiringRunnable.RandomOrder;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.RepeatedTest;
 
 /**
  * Tests implementation of ILock objects
  */
 @SuppressWarnings("restriction")
 public class OrderedLockTest {
-	@Rule
-	public RetryTestRule retry = new RetryTestRule(10); // executes all tests in the Class multiple times
-
+	private static final int REPETITIONS = 10;
 	/**
 	 * Creates n runnables on the given lock and adds them to the given list.
 	 */
@@ -50,7 +50,7 @@ public class OrderedLockTest {
 		}
 	}
 
-	@Test
+	@RepeatedTest(REPETITIONS)
 	public void testComplex() {
 		DeadlockDetector.runSilent(() -> {
 			ArrayList<LockAcquiringRunnable> allRunnables = new ArrayList<>();
@@ -68,7 +68,7 @@ public class OrderedLockTest {
 		});
 	}
 
-	@Test
+	@RepeatedTest(REPETITIONS)
 	public void testManyLocksAndThreads() {
 		int numberOfLocks = 10;
 		int numberOfThreads = 10;
@@ -98,7 +98,7 @@ public class OrderedLockTest {
 		});
 	}
 
-	@Test
+	@RepeatedTest(REPETITIONS)
 	public void testSimple() {
 		DeadlockDetector.runSilent(() -> {
 			ArrayList<LockAcquiringRunnable> allRunnables = new ArrayList<>();
@@ -114,7 +114,7 @@ public class OrderedLockTest {
 		});
 	}
 
-	@Test
+	@RepeatedTest(REPETITIONS)
 	public void testLockAcquireInterrupt() throws InterruptedException {
 		final TestBarrier2 barrier = new TestBarrier2();
 		LockManager manager = new LockManager();
@@ -150,7 +150,7 @@ public class OrderedLockTest {
 	 * test that an acquire call that times out does not
 	 * become the lock owner (regression test)
 	 */
-	@Test
+	@RepeatedTest(REPETITIONS)
 	public void testLockTimeout() {
 		//create a new lock manager and 1 lock
 		final LockManager manager = new LockManager();
@@ -203,7 +203,7 @@ public class OrderedLockTest {
 	 * test that when a Lock Listener forces the Lock Manager to grant a lock
 	 * to a waiting thread, that other threads in the queue don't get disposed (regression test)
 	 */
-	@Test
+	@RepeatedTest(REPETITIONS)
 	public void testLockRequestDisappearence() {
 		// create a new lock manager and 1 lock
 		final LockManager manager = new LockManager();
@@ -311,7 +311,7 @@ public class OrderedLockTest {
 
 		// the underlying array has to be empty
 		assertTrue("Locks not removed from graph.", manager.isEmpty());
-		errors.forEach(e -> e.printStackTrace());
+		errors.forEach(Throwable::printStackTrace);
 		assertTrue("Error happend: " + errors.stream().map(e -> "" + e).collect(Collectors.joining(", ")),
 				errors.isEmpty());
 	}
@@ -328,20 +328,24 @@ public class OrderedLockTest {
 			thread.start();
 		}
 		randomOrder.waitForEnd();
-		long maxNano = System.nanoTime() + 5000 * 1_000_000;
+		Duration timeoutTime = Duration.ofMillis(System.currentTimeMillis()).plusSeconds(5);
 		for (Thread thread : threads) {
 			try {
-				long joinMs = (maxNano - System.nanoTime()) / 1_000_000;
-				thread.join(Math.max(joinMs, 1));
-				if (thread.isAlive() || joinMs < 0) {
-					throw new IllegalStateException(
-							"Threads did not end in time. All thread infos begin: ----\n" + getThreadDump()
-									+ "---- All thread infos end.\n");
-
-				}
+				Duration remainingTime = timeoutTime.minusMillis(System.currentTimeMillis());
+				thread.join(remainingTime.toMillis());
 			} catch (InterruptedException e) {
-				throw new IllegalStateException("interrupted");
+				throw new IllegalStateException(e);
 			}
+			checkTimeout(timeoutTime);
+			assertThat(thread).matches(not(Thread::isAlive), "is not alive");
+		}
+	}
+
+	public void checkTimeout(Duration timeoutTime) {
+		Duration currentTime = Duration.ofMillis(System.currentTimeMillis());
+		if (timeoutTime.minus(currentTime).toMillis() <= 0) {
+			assertThat(currentTime.toMillis()).as("threads did not end in time. All thread infos begin: ----\n"
+					+ getThreadDump() + "---- All thread infos end.\n").isLessThan(timeoutTime.toMillis());
 		}
 	}
 

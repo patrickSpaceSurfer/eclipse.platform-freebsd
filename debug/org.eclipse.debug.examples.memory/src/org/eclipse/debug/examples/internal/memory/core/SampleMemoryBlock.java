@@ -16,7 +16,6 @@ package org.eclipse.debug.examples.internal.memory.core;
 import java.math.BigInteger;
 import java.util.ArrayList;
 
-import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.debug.core.DebugEvent;
@@ -34,7 +33,6 @@ import org.eclipse.jface.viewers.IColorProvider;
 
 /**
  * Memory Block Implementation
- *
  */
 public class SampleMemoryBlock extends DebugElement implements IMemoryBlockExtension {
 
@@ -48,10 +46,6 @@ public class SampleMemoryBlock extends DebugElement implements IMemoryBlockExten
 
 	/**
 	 * Creates memory block
-	 *
-	 * @param debugTarget
-	 * @param expression
-	 * @param address
 	 */
 	public SampleMemoryBlock(SampleDebugTarget debugTarget, String expression, BigInteger address) {
 		super(debugTarget);
@@ -62,22 +56,18 @@ public class SampleMemoryBlock extends DebugElement implements IMemoryBlockExten
 
 	@Override
 	public BigInteger getBigBaseAddress() throws DebugException {
-		fBaseAddress = fDebugTarget.getEngine().evaluateExpression(fExpression, null);
+		fBaseAddress = fDebugTarget.getEngine().evaluateExpression(fExpression);
 		return fBaseAddress;
 	}
 
 	@Override
 	public boolean supportBaseAddressModification() throws DebugException {
-		return fDebugTarget.getEngine().suppostsBaseAddressModification(this);
+		return fDebugTarget.getEngine().suppostsBaseAddressModification();
 	}
 
 	@Override
 	public void setBaseAddress(BigInteger address) throws DebugException {
-		try {
 			fDebugTarget.getEngine().setBaseAddress(this, address);
-		} catch (CoreException e) {
-			throw new DebugException(e.getStatus());
-		}
 	}
 
 	@Override
@@ -89,29 +79,25 @@ public class SampleMemoryBlock extends DebugElement implements IMemoryBlockExten
 	@Override
 	public MemoryByte[] getBytesFromAddress(BigInteger address, long length) throws DebugException {
 
-		try {
-			MemoryByte[] bytes = new MemoryByte[(int) length * fDebugTarget.getEngine().getAddressableSize()];
-			BigInteger addressCnt = address;
-			int lengthCnt = (int) length;
-			int i = 0;
+		MemoryByte[] bytes = new MemoryByte[(int) length * fDebugTarget.getEngine().getAddressableSize()];
+		BigInteger addressCnt = address;
+		int lengthCnt = (int) length;
+		int i = 0;
 
-			// asks engine to get bytes from address
-			MemoryByte[] engineBytes = fDebugTarget.getEngine().getBytesFromAddress(addressCnt, lengthCnt);
-			System.arraycopy(engineBytes, 0, bytes, i, engineBytes.length);
+		// asks engine to get bytes from address
+		MemoryByte[] engineBytes = fDebugTarget.getEngine().getBytesFromAddress(addressCnt, lengthCnt);
+		System.arraycopy(engineBytes, 0, bytes, i, engineBytes.length);
 
-			// if engine did not return enough memory, pad with dummy memory
-			for (int j = i + engineBytes.length; j < bytes.length; j++) {
-				MemoryByte mb = new MemoryByte((byte) 0);
-				mb.setReadable(false);
-				mb.setWritable(false);
-				mb.setBigEndian(fDebugTarget.getEngine().isBigEndian(address.add(BigInteger.valueOf(j))));
-				bytes[j] = mb;
-			}
-
-			return bytes;
-		} catch (RuntimeException e) {
-			throw e;
+		// if engine did not return enough memory, pad with dummy memory
+		for (int j = i + engineBytes.length; j < bytes.length; j++) {
+			MemoryByte mb = new MemoryByte((byte) 0);
+			mb.setReadable(false);
+			mb.setWritable(false);
+			mb.setBigEndian(fDebugTarget.getEngine().isBigEndian(address.add(BigInteger.valueOf(j))));
+			bytes[j] = mb;
 		}
+
+		return bytes;
 	}
 
 	@Override
@@ -177,7 +163,7 @@ public class SampleMemoryBlock extends DebugElement implements IMemoryBlockExten
 
 	@Override
 	public boolean supportsValueModification() {
-		return fDebugTarget.getEngine().supportsValueModification(this);
+		return fDebugTarget.getEngine().supportsValueModification();
 	}
 
 	@Override
@@ -263,11 +249,7 @@ public class SampleMemoryBlock extends DebugElement implements IMemoryBlockExten
 
 	@Override
 	public int getAddressSize() throws DebugException {
-		try {
-			return fDebugTarget.getEngine().getAddressSize();
-		} catch (CoreException e) {
-			throw new DebugException(e.getStatus());
-		}
+		return fDebugTarget.getEngine().getAddressSize();
 	}
 
 	@Override

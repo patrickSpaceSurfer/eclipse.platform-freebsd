@@ -13,7 +13,12 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.session;
 
-import junit.framework.Test;
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestPluginConstants.PI_RESOURCES_TESTS;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.eclipse.core.filesystem.EFS;
 import org.eclipse.core.filesystem.IFileStore;
 import org.eclipse.core.resources.IFile;
@@ -23,50 +28,61 @@ import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.Platform;
-import org.eclipse.core.tests.resources.AutomatedResourceTests;
-import org.eclipse.core.tests.session.WorkspaceSessionTestSuite;
+import org.eclipse.core.tests.harness.session.SessionTestExtension;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Tests regression of bug 113943 - linked resources not having
- * correct location after restart.
+ * Tests regression of bug 113943 - linked resources not having correct location
+ * after restart.
  */
-public class TestBug113943 extends WorkspaceSerializationTest {
-	IPath location = Platform.getLocation().removeLastSegments(1).append("OtherLocation");
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+public class TestBug113943 {
 
-	public static Test suite() {
-		return new WorkspaceSessionTestSuite(AutomatedResourceTests.PI_RESOURCES_TESTS, TestBug113943.class);
-	}
+	@RegisterExtension
+	static SessionTestExtension sessionTestExtension = SessionTestExtension.forPlugin(PI_RESOURCES_TESTS)
+			.withCustomization(SessionTestExtension.createCustomWorkspace()).create();
 
 	/**
-	 * Setup.  Creates a project with a linked resource.
+	 * Setup, Creates a project with a linked resource.
 	 */
+	@Test
+	@Order(1)
 	public void test1() throws Exception {
-		IProject project = workspace.getRoot().getProject("Project1");
+		IProject project = getWorkspace().getRoot().getProject("Project1");
 		IFolder link = project.getFolder("link");
 		IFile linkChild = link.getFile("child.txt");
-		ensureExistsInWorkspace(project, true);
-		IFileStore parent = EFS.getStore(location.toFile().toURI());
+		createInWorkspace(project);
+
+		IPath parentLocation = Platform.getLocation().removeLastSegments(1).append("OtherLocation");
+		IFileStore parent = EFS.getStore(parentLocation.toFile().toURI());
 		IFileStore child = parent.getChild(linkChild.getName());
-		parent.mkdir(EFS.NONE, getMonitor());
-		child.openOutputStream(EFS.NONE, getMonitor()).close();
-		link.createLink(location, IResource.NONE, getMonitor());
+		parent.mkdir(EFS.NONE, createTestMonitor());
+		child.openOutputStream(EFS.NONE, createTestMonitor()).close();
+		link.createLink(parentLocation, IResource.NONE, createTestMonitor());
 
-		assertTrue("1.0", link.exists());
-		assertTrue("1.1", linkChild.exists());
+		assertTrue(link.exists());
+		assertTrue(linkChild.exists());
 
-		getWorkspace().save(true, getMonitor());
+		getWorkspace().save(true, createTestMonitor());
 	}
 
 	/**
 	 * Refresh the linked resource and check that its content is intact
 	 */
+	@Test
+	@Order(2)
 	public void test2() throws CoreException {
-		IProject project = workspace.getRoot().getProject("Project1");
+		IProject project = getWorkspace().getRoot().getProject("Project1");
 		IFolder link = project.getFolder("link");
 		IFile linkChild = link.getFile("child.txt");
-		link.refreshLocal(IResource.DEPTH_INFINITE, getMonitor());
+		link.refreshLocal(IResource.DEPTH_INFINITE, createTestMonitor());
 
-		assertTrue("1.0", link.exists());
-		assertTrue("1.1", linkChild.exists());
+		assertTrue(link.exists());
+		assertTrue(linkChild.exists());
 	}
+
 }

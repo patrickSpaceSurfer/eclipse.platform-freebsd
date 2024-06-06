@@ -13,36 +13,49 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.session;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static java.util.function.Predicate.not;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.harness.FileSystemHelper.getTempDir;
+import static org.eclipse.core.tests.resources.ResourceTestPluginConstants.PI_RESOURCES_TESTS;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInputStream;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import junit.framework.Test;
+import java.io.InputStream;
+import java.io.OutputStream;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IMarker;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.runtime.jobs.Job;
-import org.eclipse.core.tests.resources.WorkspaceSessionTest;
-import org.eclipse.core.tests.session.WorkspaceSessionTestSuite;
+import org.eclipse.core.tests.harness.session.SessionTestExtension;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Tests for bug 266907
  */
-public class Bug_266907 extends WorkspaceSessionTest {
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+public class Bug_266907 {
 
 	private static final String PROJECT_NAME = "Project";
 	private static final String FILE_NAME = "File";
 	private static final String MARKER_ATTRIBUTE_NAME = "AttributeName";
 	private static final String MARKER_ATTRIBUTE = "Attribute";
 
-	public static Test suite() {
-		return new WorkspaceSessionTestSuite(PI_RESOURCES_TESTS, Bug_266907.class);
-	}
+	@RegisterExtension
+	static SessionTestExtension sessionTestExtension = SessionTestExtension.forPlugin(PI_RESOURCES_TESTS)
+			.withCustomization(SessionTestExtension.createCustomWorkspace()).create();
 
+	@Test
+	@Order(1)
 	public void test1CreateProjectAndDeleteProjectFile() throws Exception {
 		// Ensure that no asynchronous save job restores the .project file after
 		// deleting it by suspending the JobManager for this workspace session
@@ -50,11 +63,11 @@ public class Bug_266907 extends WorkspaceSessionTest {
 
 		final IWorkspace workspace = getWorkspace();
 		IProject project = workspace.getRoot().getProject(PROJECT_NAME);
-		project.create(getMonitor());
-		project.open(getMonitor());
+		project.create(createTestMonitor());
+		project.open(createTestMonitor());
 
 		IFile f = project.getFile(FILE_NAME);
-		f.create(getContents("content"), true, getMonitor());
+		f.create(createInputStream("content"), true, createTestMonitor());
 
 		IMarker marker = f.createMarker(IMarker.BOOKMARK);
 		marker.setAttribute(MARKER_ATTRIBUTE_NAME, MARKER_ATTRIBUTE);
@@ -62,39 +75,47 @@ public class Bug_266907 extends WorkspaceSessionTest {
 		// remember the location of .project to delete is at the end
 		File dotProject = project.getFile(".project").getLocation().toFile();
 
-		workspace.save(true, getMonitor());
+		workspace.save(true, createTestMonitor());
 
 		// move .project to a temp location
 		File dotProjectCopy = getTempDir().append("dotProjectCopy").toFile();
 		dotProjectCopy.createNewFile();
-		transferStreams(new FileInputStream(dotProject), new FileOutputStream(dotProjectCopy), null);
+		try (InputStream input = new FileInputStream(dotProject);
+				OutputStream output = new FileOutputStream(dotProjectCopy)) {
+			input.transferTo(output);
+		}
 		dotProject.delete();
 	}
 
+	@Test
+	@Order(2)
 	public void test2RestoreWorkspaceFile() throws Exception {
 		final IWorkspace workspace = getWorkspace();
 		IProject project = workspace.getRoot().getProject(PROJECT_NAME);
 
 		// the project should be closed cause .project is removed
-		assertThat("project should not be accessible", project.isAccessible(), is(false));
+		assertThat(project).matches(not(IProject::isAccessible), "is not accessible");
 
 		// recreate .project
 		File dotProject = project.getFile(".project").getLocation().toFile();
 		File dotProjectCopy = getTempDir().append("dotProjectCopy").toFile();
 
 		dotProject.createNewFile();
-		transferStreams(new FileInputStream(dotProjectCopy), new FileOutputStream(dotProject), null);
+		try (InputStream input = new FileInputStream(dotProjectCopy);
+				OutputStream output = new FileOutputStream(dotProject)) {
+			input.transferTo(output);
+		}
 		dotProjectCopy.delete();
 
-		project.open(getMonitor());
-		assertThat("project should be accessible", project.isAccessible(), is(true));
+		project.open(createTestMonitor());
+		assertThat(project).matches(IProject::isAccessible, "is accessible");
 
 		IFile file = project.getFile(FILE_NAME);
 		IMarker[] markers = file.findMarkers(IMarker.BOOKMARK, false, IResource.DEPTH_ZERO);
-		assertThat("unexpected number of markers in test project", markers.length, is(1));
+		assertThat(markers).as("number of markers").hasSize(1);
 
 		Object attribute = markers[0].getAttribute(MARKER_ATTRIBUTE_NAME);
-		assertThat("unexpected name of marker", attribute, is(MARKER_ATTRIBUTE));
+		assertThat(attribute).as("name of marker").isEqualTo(MARKER_ATTRIBUTE);
 	}
 
 }

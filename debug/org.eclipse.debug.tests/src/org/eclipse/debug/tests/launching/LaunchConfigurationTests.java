@@ -14,6 +14,7 @@
  *******************************************************************************/
 package org.eclipse.debug.tests.launching;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -177,7 +178,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	 * @param stream the stream to get as a byte array
 	 * @param length the length to read from the stream or -1 for unknown
 	 * @return the given input stream as a byte array
-	 * @throws IOException
 	 */
 	public static byte[] getInputStreamAsByteArray(InputStream stream, int length) throws IOException {
 		byte[] contents;
@@ -224,8 +224,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Returns a scratch project for launch configurations
-	 *
-	 * @return
 	 */
 	protected IProject getProject() throws CoreException {
 		return TestsPlugin.createProject("LaunchConfigurationTests"); //$NON-NLS-1$
@@ -311,8 +309,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Creates a local working copy configuration, sets some attributes, and
 	 * saves the working copy, and retrieves the attributes.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testCreateLocalConfiguration() throws CoreException {
@@ -339,8 +335,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Creates a local working copy configuration and tests its name.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testLocalName() throws CoreException {
@@ -375,8 +369,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Ensures that a launch configuration returns a complete attribute map
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testGetAttributes() throws CoreException {
@@ -400,8 +392,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Ensures that set attributes works
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testSetAttributes() throws CoreException {
@@ -428,8 +418,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Ensures that set attributes to <code>null</code> works
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testSetNullAttributes() throws CoreException {
@@ -451,8 +439,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	 * Creates a local working copy configuration, sets some attributes, and
 	 * saves the working copy, and retrieves the attributes. Copy the
 	 * configuration and ensure the original still exists.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testLocalCopy() throws CoreException {
@@ -494,8 +480,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Create a config and save it twice, ensuring it only ends up in the index
 	 * once.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testDoubleSave() throws CoreException {
@@ -522,7 +506,7 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 		wc.doSave();
 
 		ILaunchConfiguration[] newConfigs = getLaunchManager().getLaunchConfigurations();
-		assertTrue("Should be the same number of configs", newConfigs.length == configs.length); //$NON-NLS-1$
+		assertThat(newConfigs).as("compare number of configs").hasSameSizeAs(configs);
 
 		// cleanup
 		handle.delete();
@@ -534,8 +518,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	 * Creates a local working copy configuration, sets some attributes, and
 	 * saves the working copy, and retrieves the attributes. Deletes the
 	 * configuration and ensures it no longer exists.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testDeleteLocalConfiguration() throws CoreException {
@@ -564,8 +546,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	 * saves the working copy, and retrieves the attributes. Renames the
 	 * configuration and ensures it's old config no longer exists, and that
 	 * attributes are retrievable from the new (renamed) config.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testRenameLocalConfiguration() throws CoreException {
@@ -609,8 +589,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Moves a local configuration to a shared location
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testMoveLocalToSharedConfiguration() throws CoreException {
@@ -654,8 +632,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Moves a local configuration to a shared location
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testMoveSharedToLocalConfiguration() throws CoreException {
@@ -700,8 +676,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Creates a shared working copy configuration, sets some attributes, and
 	 * saves the working copy, and retrieves the attributes.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testCreateSharedConfiguration() throws CoreException {
@@ -818,8 +792,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	 * Creates a shared working copy configuration, sets some attributes, and
 	 * saves the working copy, and retrieves the attributes. Copies the
 	 * configuration and ensures the original still exists.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testSharedCopy() throws CoreException {
@@ -861,8 +833,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	 * Creates a shared working copy configuration, sets some attributes, and
 	 * saves the working copy, and retrieves the attributes. Deletes the
 	 * configuration and ensures it no longer exists.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testDeleteSharedConfiguration() throws CoreException {
@@ -890,8 +860,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	 * saves the working copy, and retrieves the attributes. Renames the
 	 * configuration and ensures it's old config no longer exists, and that
 	 * attributes are retrievable from the new (renamed) config.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testRenameSharedConfiguration() throws CoreException {
@@ -942,8 +910,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Creates a few configs, closes the project and re-opens the project to
 	 * ensure the config index is persisted properly
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testPersistIndex() throws CoreException {
@@ -970,7 +936,7 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 		project.open(null);
 		assertTrue("Should only be local configs when closed", local); //$NON-NLS-1$
 		ILaunchConfiguration[] after = getLaunchManager().getLaunchConfigurations();
-		assertTrue("Should be same number of configs after openning", after.length == before.length); //$NON-NLS-1$
+		assertThat(after).as("compare number of configs").hasSameSizeAs(before);
 		for (ILaunchConfiguration b : before) {
 			assertTrue("Config should exist after openning", existsIn(after, b)); //$NON-NLS-1$
 		}
@@ -1027,8 +993,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Ensures that a removal notification is sent for a shared config in a
 	 * project that is deleted.
-	 *
-	 * @throws Exception
 	 */
 	@Test
 	public void testDeleteProjectWithSharedConfig() throws Exception {
@@ -1063,8 +1027,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Tests a nested working copy.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testNestedWorkingCopyLocalConfiguration() throws CoreException {
@@ -1120,9 +1082,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Creates a configuration in an EFS linked folder. Deletes configuration
 	 * directly.
-	 *
-	 * @throws CoreException
-	 * @throws URISyntaxException
 	 */
 	@Test
 	public void testCreateDeleteEFS() throws CoreException, URISyntaxException {
@@ -1155,9 +1114,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Creates a configuration in an EFS linked folder. Deletes the folder to
 	 * ensure the configuration is also deleted.
-	 *
-	 * @throws CoreException
-	 * @throws URISyntaxException
 	 */
 	@Test
 	public void testCreateDeleteEFSLink() throws CoreException, URISyntaxException {
@@ -1187,8 +1143,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Test that renaming a project with a linked EFS folder containing a shared
 	 * launch configuration is properly updated.
-	 *
-	 * @throws Exception
 	 */
 	@Test
 	public void testEFSProjectRename() throws Exception {
@@ -1251,8 +1205,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Tests launch configuration import.
-	 *
-	 * @throws Exception
 	 */
 	@Test
 	public void testImport() throws Exception {
@@ -1305,8 +1257,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Tests the location of a local working copy.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testWorkingCopyGetLocation() throws CoreException {
@@ -1388,7 +1338,7 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	 * Tests that a launch is properly registered for notifications before a
 	 * process is spawned and may already propagate a termination event.
 	 *
-	 * see <a href="https://github.com/eclipse-platform/eclipse.platform/issues/598">598</a>
+	 * @see <a href="https://github.com/eclipse-platform/eclipse.platform/issues/598">598</a>
 	 */
 	@Test
 	public void testTerminateLaunchListener_Issue598() throws Exception {
@@ -1453,8 +1403,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Tests that attributes in a nested map are persisted in alphabetical
 	 * order.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testMapAttributePersistence() throws CoreException, IOException {
@@ -1526,18 +1474,12 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 			chars1 = getInputStreamAsCharArray(in1);
 			chars2 = getInputStreamAsCharArray(in2);
 		}
-		assertEquals("Should be the same characters", chars1.length, chars2.length); //$NON-NLS-1$
-		for (int i = 0; i < chars2.length; i++) {
-			assertEquals("Should be the same character", chars1[i], chars2[i]); //$NON-NLS-1$
-		}
-
+		assertThat(chars1).isEqualTo(chars2);
 	}
 
 	/**
 	 * Tests that attributes in a nested set are persisted in alphabetical
 	 * order.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testSetAttributePersistence() throws CoreException, IOException {
@@ -1609,11 +1551,7 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 			chars1 = getInputStreamAsCharArray(in1);
 			chars2 = getInputStreamAsCharArray(in2);
 		}
-		assertEquals("Should be the same characters", chars1.length, chars2.length); //$NON-NLS-1$
-		for (int i = 0; i < chars2.length; i++) {
-			assertEquals("Should be the same character", chars1[i], chars2[i]); //$NON-NLS-1$
-		}
-
+		assertThat(chars1).isEqualTo(chars2);
 	}
 
 	/**
@@ -1662,8 +1600,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Test that moving and renaming a shared configuration at the same time
 	 * works.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testRenameAndMoveShared() throws CoreException {
@@ -1691,8 +1627,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	 *
 	 * Bug 381175 - [patch] launchConfigurationTypeImage to support platform:
 	 * style icons
-	 *
-	 * @throws Exception
 	 */
 	@Test
 	public void testGetTypeImageFromURI() throws Exception {
@@ -1703,8 +1637,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Test support for a declared launch configuration type image
-	 *
-	 * @throws Exception
 	 */
 	@Test
 	public void testGetTyeImage() throws Exception {
@@ -1716,10 +1648,7 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Tests that we can get a project handle from a project name
 	 *
-	 * see
-	 * <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=395441">395441</a>
-	 *
-	 * @throws Exception
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=395441">395441</a>
 	 * @since 3.9.0
 	 */
 	@Test
@@ -1731,7 +1660,7 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 			setResourceMappings(wc, new ResourceItem[] { new ResourceItem("test.project", Integer.valueOf(IResource.PROJECT)) }); //$NON-NLS-1$
 			IResource[] res = wc.getMappedResources();
 			assertNotNull("There should be mapped resources", res); //$NON-NLS-1$
-			assertTrue("There should be one project", res.length == 1); //$NON-NLS-1$
+			assertThat(res).hasSize(1);
 		}
 		finally {
 			lc.delete();
@@ -1741,10 +1670,7 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Tests that we cannot get a project handle from a bogus project name
 	 *
-	 * see
-	 * <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=395441">395441</a>
-	 *
-	 * @throws Exception
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=395441">395441</a>
 	 * @since 3.9.0
 	 */
 	@Test
@@ -1765,10 +1691,7 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Tests that we cannot get a project handle from a bogus project name
 	 *
-	 * see
-	 * <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=395441">395441</a>
-	 *
-	 * @throws Exception
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=395441">395441</a>
 	 * @since 3.9.0
 	 */
 	@Test
@@ -1794,10 +1717,7 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Tests that we can get a project handle from an absolute project name
 	 *
-	 * see
-	 * <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=395441">395441</a>
-	 *
-	 * @throws Exception
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=395441">395441</a>
 	 * @since 3.9.0
 	 */
 	@Test
@@ -1819,10 +1739,7 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	 * Tests that a launch created without a backing
 	 * {@link ILaunchConfiguration} does not cause {@link NullPointerException}s
 	 *
-	 * see
-	 * <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=416691">416691</a>
-	 *
-	 * @throws Exception
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=416691">416691</a>
 	 * @since 3.9.0
 	 */
 	@Test
@@ -1844,7 +1761,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Proxy to set resource paths, allowing invalid resource paths to be set
 	 *
-	 * @param resources
 	 * @since 3.9.0
 	 */
 	protected void setResourceMappings(ILaunchConfigurationWorkingCopy config, ResourceItem[] resources) {
@@ -1865,8 +1781,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Test copying attributes from one configuration to another.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testCopyAttributes() throws CoreException {
@@ -1881,8 +1795,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Tests that creation from a prototype works.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testCreationFromPrototype() throws CoreException {
@@ -1899,8 +1811,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Tests setting the 'isPrototype' attribute.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testIsPrototype() throws CoreException {
@@ -1916,8 +1826,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Tests finding references to a prototype.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testPrototypeChildren() throws CoreException {
@@ -1946,8 +1854,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Tests that when an attribute is removed from a working copy, it does not
 	 * get inherited from its prototype.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testPrototypeRemoveBehavior() throws CoreException {
@@ -1971,8 +1877,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 	/**
 	 * Tests that setting a configuration's prototype to null cleans its
 	 * prototype association.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testUnPrototype() throws CoreException {
@@ -1995,8 +1899,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Tests that nested prototypes are not allowed.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testNestedPrototypes() throws CoreException {
@@ -2013,8 +1915,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Test that you cannot set a config's prototype to be a non-prototype.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testIllegalPrototype() throws CoreException {
@@ -2032,8 +1932,6 @@ public class LaunchConfigurationTests extends AbstractLaunchTest implements ILau
 
 	/**
 	 * Test that a prototype can be duplicated (and results in a prototype).
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testCopyPrototype() throws CoreException {

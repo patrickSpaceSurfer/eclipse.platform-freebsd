@@ -15,7 +15,7 @@
   <parent>
     <groupId>org.eclipse.platform</groupId>
     <artifactId>eclipse.platform</artifactId>
-    <version>4.30.0-SNAPSHOT</version>
+    <version>4.32.0-SNAPSHOT</version>
   </parent>
   <groupId>eclipse.platform.ua</groupId>
   <artifactId>eclipse.platform.ua</artifactId>
@@ -41,8 +41,8 @@
     <module>org.eclipse.tips.ide</module>
     <module>org.eclipse.tips.json</module>
     <module>org.eclipse.tips.feature</module>
+    <module>org.eclipse.tips.tests</module>
     
     <module>infocenter-web</module>
   </modules>
 </project>
-

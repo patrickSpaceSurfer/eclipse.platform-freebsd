@@ -13,21 +13,29 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.regression;
 
+import static org.junit.Assert.assertThrows;
+
 import java.util.Arrays;
 import org.eclipse.core.resources.IMarker;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.tests.resources.ResourceTest;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Rule;
+import org.junit.Test;
 
 /**
  * Tests regression of bug 288315 - MarkerInfo.setAttributes(Map map) calls
  * checkValidAttribute which throws IllegalArgumentException.
  */
-public class Bug_288315 extends ResourceTest {
+public class Bug_288315 {
+
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
 
 	/**
 	 * Tests that creating a marker with very long value causes failure.
 	 */
+	@Test
 	public void testBug() throws CoreException {
 		char[] chars = new char[65537];
 		Arrays.fill(chars, 'a');
@@ -35,33 +43,13 @@ public class Bug_288315 extends ResourceTest {
 		Float value2 = Float.valueOf(1.1f);
 
 		IMarker nonPersistentMarker = ResourcesPlugin.getWorkspace().getRoot().createMarker(IMarker.MARKER);
-		try {
-			nonPersistentMarker.setAttribute(IMarker.MESSAGE, value1);
-			nonPersistentMarker.setAttribute(IMarker.MESSAGE, value2);
-		} catch (RuntimeException e) {
-			fail("1.0", e);
-		} catch (CoreException e) {
-			fail("1.1", e);
-		}
+		nonPersistentMarker.setAttribute(IMarker.MESSAGE, value1);
+		nonPersistentMarker.setAttribute(IMarker.MESSAGE, value2);
 		nonPersistentMarker.delete();
 
 		IMarker persistentMarker = ResourcesPlugin.getWorkspace().getRoot().createMarker(IMarker.PROBLEM);
-		try {
-			persistentMarker.setAttribute(IMarker.MESSAGE, value1);
-			fail("1.2");
-		} catch (RuntimeException e) {
-			// expected
-		} catch (CoreException e) {
-			fail("1.3", e);
-		}
-		try {
-			persistentMarker.setAttribute(IMarker.MESSAGE, value2);
-			fail("1.4");
-		} catch (RuntimeException e) {
-			// expected
-		} catch (CoreException e) {
-			fail("1.5", e);
-		}
+		assertThrows(RuntimeException.class, () -> persistentMarker.setAttribute(IMarker.MESSAGE, value1));
+		assertThrows(RuntimeException.class, () -> persistentMarker.setAttribute(IMarker.MESSAGE, value2));
 		persistentMarker.delete();
 	}
 

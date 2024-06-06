@@ -13,19 +13,28 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.regression;
 
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 import org.eclipse.core.resources.IPathVariableManager;
 import org.eclipse.core.resources.ResourcesPlugin;
-import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IStatus;
-import org.eclipse.core.tests.resources.ResourceTest;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Ignore;
+import org.junit.Rule;
+import org.junit.Test;
 
 /**
  * Test for Bug 380386
  */
-public class Bug_380386 extends ResourceTest {
+public class Bug_380386 {
 
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
+
+	@Test
+	@Ignore("This regression test has to be rewritten in a proper way")
 	public void testBug() throws Exception {
-
 		String path = "C:\\temp";
 		java.net.URI value = new java.io.File(path).toURI();
 		IPathVariableManager pathManager = ResourcesPlugin.getWorkspace().getPathVariableManager();
@@ -55,10 +64,7 @@ public class Bug_380386 extends ResourceTest {
 		assertTrue("3.0", statusName.isOK());
 		assertNotNull("4.0", statusValue.isOK());
 
-		try {
-			pathManager.setURIValue(name, value);
-		} catch (CoreException e) {
-			fail("5.0", e);
-		}
+		pathManager.setURIValue(name, value);
 	}
+
 }

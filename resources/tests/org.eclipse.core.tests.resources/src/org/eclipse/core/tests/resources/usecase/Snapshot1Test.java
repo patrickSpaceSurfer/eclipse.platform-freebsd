@@ -13,6 +13,14 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.usecase;
 
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.assertExistsInFileSystem;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.assertExistsInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.buildResources;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInWorkspace;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.CoreException;
@@ -23,7 +31,7 @@ import org.eclipse.core.runtime.CoreException;
  * as expected (failing or not) and may add more "user actions" to be
  * verified in the next session and so on.
  */
-public class Snapshot1Test extends SnapshotTest {
+public class Snapshot1Test {
 
 	protected static String[] defineHierarchy1() {
 		return new String[] {"/folder110/", "/folder110/folder120/", "/folder110/folder120/folder130/", "/folder110/folder120/folder130/folder140/", "/folder110/folder120/folder130/folder140/folder150/", "/folder110/folder120/folder130/folder140/folder150/file160", "/folder110/folder120/folder130/folder140/file150", "/folder110/folder121/", "/folder110/folder121/folder131/", "/folder110/folder120/folder130/folder141/"};
@@ -35,38 +43,38 @@ public class Snapshot1Test extends SnapshotTest {
 
 	// copy and paste in the scrapbook to run
 	public void testCreateMyProject() throws CoreException {
-		IProject project = getWorkspace().getRoot().getProject(PROJECT_1);
+		IProject project = getWorkspace().getRoot().getProject(SnapshotTest.PROJECT_1);
 		project.create(null);
 		project.open(null);
-		assertTrue("0.1", project.exists());
-		assertTrue("0.2", project.isOpen());
+		assertTrue(project.exists());
+		assertTrue(project.isOpen());
 
 		// create some children
 		IResource[] resources = buildResources(project, defineHierarchy1());
-		ensureExistsInWorkspace(resources, true);
-		assertExistsInFileSystem("1.1", resources);
-		assertExistsInWorkspace("1.2", resources);
+		createInWorkspace(resources);
+		assertExistsInFileSystem(resources);
+		assertExistsInWorkspace(resources);
 
 		project.close(null);
-		assertTrue("2.1", project.exists());
-		assertTrue("2.2", !project.isOpen());
+		assertTrue(project.exists());
+		assertFalse(project.isOpen());
 	}
 
 	/**
 	 * Create another project and leave it closed for next session.
 	 */
 	public void testCreateProject2() throws CoreException {
-		IProject project = getWorkspace().getRoot().getProject(PROJECT_2);
+		IProject project = getWorkspace().getRoot().getProject(SnapshotTest.PROJECT_2);
 		project.create(null);
 		project.open(null);
-		assertTrue("0.1", project.exists());
-		assertTrue("0.2", project.isOpen());
+		assertTrue(project.exists());
+		assertTrue(project.isOpen());
 
 		// create some children
 		IResource[] resources = buildResources(project, defineHierarchy2());
-		ensureExistsInWorkspace(resources, true);
-		assertExistsInFileSystem("3.1", resources);
-		assertExistsInWorkspace("3.2", resources);
+		createInWorkspace(resources);
+		assertExistsInFileSystem(resources);
+		assertExistsInWorkspace(resources);
 	}
 
 	public void testSnapshotWorkspace() throws CoreException {

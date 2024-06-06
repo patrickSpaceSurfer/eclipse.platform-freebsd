@@ -14,6 +14,8 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Vector;
@@ -36,62 +38,41 @@ public class MarkersChangeListener implements IResourceChangeListener {
 	}
 
 	/**
-	 * Returns whether the changes for the given resource (or null for the workspace)
+	 * Asserts whether the changes for the given resource (or null for the workspace)
 	 * are exactly the added, removed and changed markers given. The arrays may be null.
 	 */
-	public boolean checkChanges(IResource resource, IMarker[] added, IMarker[] removed, IMarker[] changed) {
+	public void assertChanges(IResource resource, IMarker[] added, IMarker[] removed, IMarker[] changed) {
 		IPath path = resource == null ? IPath.ROOT : resource.getFullPath();
 		List<IMarkerDelta> v = changes.get(path);
 		if (v == null) {
 			v = new Vector<>();
 		}
 		int numChanges = (added == null ? 0 : added.length) + (removed == null ? 0 : removed.length) + (changed == null ? 0 : changed.length);
-		if (numChanges != v.size()) {
-			return false;
-		}
+		assertThat(numChanges).as("number of markers for resource %s", path).isEqualTo(v.size());
+
 		for (IMarkerDelta delta : v) {
 			switch (delta.getKind()) {
-				case IResourceDelta.ADDED :
-					if (!contains(added, delta.getMarker())) {
-						return false;
-					}
-					break;
-				case IResourceDelta.REMOVED :
-					if (!contains(removed, delta.getMarker())) {
-						return false;
-					}
-					break;
-				case IResourceDelta.CHANGED :
-					if (!contains(changed, delta.getMarker())) {
-						return false;
-					}
-					break;
-				default :
-					throw new Error();
+			case IResourceDelta.ADDED:
+				assertThat(added).as("check added markers contain resource %s", path).contains(delta.getMarker());
+				break;
+			case IResourceDelta.REMOVED:
+				assertThat(removed).as("check removed markers contain resource %s", path).contains(delta.getMarker());
+				break;
+			case IResourceDelta.CHANGED:
+				assertThat(changed).as("check changed markers contain resource %s", path).contains(delta.getMarker());
+				break;
+			default:
+				throw new IllegalArgumentException("delta with unsupported kind: " + delta);
 			}
 		}
-		return true;
 	}
 
 	/**
-	 * Returns whether the given marker is contained in the given list of markers.
+	 * Asserts the number of resources (or the workspace) which have had marker
+	 * changes since last reset.
 	 */
-	protected boolean contains(IMarker[] markers, IMarker marker) {
-		if (markers != null) {
-			for (IMarker marker2 : markers) {
-				if (marker2.equals(marker)) {
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-
-	/**
-	 * Returns the number of resources (or the workspace) which have had marker changes since last reset.
-	 */
-	public int numAffectedResources() {
-		return changes.size();
+	public void assertNumberOfAffectedResources(int expectedNumberOfResource) {
+		assertThat(changes).hasSize(expectedNumberOfResource);
 	}
 
 	public void reset() {

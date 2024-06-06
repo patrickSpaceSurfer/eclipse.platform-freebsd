@@ -13,55 +13,63 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.regression;
 
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.assertDoesNotExistInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInFileSystem;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createUniqueString;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.setReadOnly;
+import static org.junit.Assert.assertThrows;
+
 import org.eclipse.core.filesystem.IFileStore;
-import org.eclipse.core.resources.*;
+import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IProjectDescription;
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.NullProgressMonitor;
-import org.eclipse.core.tests.resources.ResourceTest;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 
-public class Bug_264182 extends ResourceTest {
+public class Bug_264182 {
+
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
 
 	IProject project;
 	IFile dotProject;
 
-	@Override
-	protected void setUp() throws Exception {
-		super.setUp();
-
+	@Before
+	public void setUp() throws Exception {
 		// create a project
-		project = getWorkspace().getRoot().getProject(getUniqueString());
-		try {
-			project.create(new NullProgressMonitor());
-			project.open(new NullProgressMonitor());
-		} catch (CoreException e) {
-			fail("Project creation failed", e);
-		}
+		project = getWorkspace().getRoot().getProject(createUniqueString());
+		project.create(new NullProgressMonitor());
+		project.open(new NullProgressMonitor());
 
 		// set the description read-only
 		dotProject = project.getFile(IProjectDescription.DESCRIPTION_FILE_NAME);
 		setReadOnly(dotProject, true);
 	}
 
-	@Override
-	protected void tearDown() throws Exception {
+	@After
+	public void tearDown() throws Exception {
 		// make the description writable
 		setReadOnly(dotProject, false);
-		super.tearDown();
 	}
 
-	public void testBug() {
+	@Test
+	public void testBug() throws Exception {
 		// create a linked resource
-		final IFile file = project.getFile(getUniqueString());
-		IFileStore tempFileStore = getTempStore();
-		createFileInFileSystem(tempFileStore);
-		try {
-			file.createLink(tempFileStore.toURI(), IResource.NONE, new NullProgressMonitor());
-			fail("1.0");
-		} catch (CoreException e) {
-			// should fail updating the description
-		}
+		final IFile file = project.getFile(createUniqueString());
+		IFileStore tempFileStore = workspaceRule.getTempStore();
+		createInFileSystem(tempFileStore);
+		assertThrows(CoreException.class,
+				() -> file.createLink(tempFileStore.toURI(), IResource.NONE, new NullProgressMonitor()));
 
 		// the file should not exist in the workspace
 		assertDoesNotExistInWorkspace(file);
 	}
+
 }

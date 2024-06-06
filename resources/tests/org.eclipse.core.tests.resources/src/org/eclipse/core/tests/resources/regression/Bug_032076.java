@@ -13,65 +13,72 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.regression;
 
-import java.io.IOException;
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createRandomString;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createUniqueString;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.isReadOnlySupported;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.setReadOnly;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
+
 import java.io.InputStream;
 import org.eclipse.core.filesystem.IFileStore;
 import org.eclipse.core.internal.resources.Resource;
-import org.eclipse.core.resources.*;
+import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IFolder;
+import org.eclipse.core.resources.IMarker;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IProjectDescription;
+import org.eclipse.core.resources.IResource;
+import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.Platform.OS;
-import org.eclipse.core.tests.resources.ResourceTest;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Ignore;
+import org.junit.Rule;
+import org.junit.Test;
 
 /**
  * When moving a resource "x" from parent "a" to parent "b", if "x" or any of
  * its children can't be deleted, both "a" and "b" become out-of-sync and resource info is lost.
  */
-public class Bug_032076 extends ResourceTest {
+public class Bug_032076 {
 
-	public void testFileBugOnWindows() {
-		if (!OS.isWindows()) {
-			return;
-		}
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
 
-		InputStream input = null;
-		IProject project = null;
-		try {
-			IWorkspace workspace = getWorkspace();
-			project = workspace.getRoot().getProject(getUniqueString());
-			IFolder sourceParent = project.getFolder("source_parent");
-			IFolder destinationParent = project.getFolder("destination_parent");
-			// this file will be made irremovable
-			IFile sourceFile = sourceParent.getFile("file1.txt");
-			IFile destinationFile = destinationParent.getFile(sourceFile.getName());
+	@Test
+	public void testFileBugOnWindows() throws Exception {
+		assumeTrue("only relevant on Windows", OS.isWindows());
 
-			ensureExistsInWorkspace(new IResource[] {sourceFile, destinationParent}, true);
+		IWorkspace workspace = getWorkspace();
+		IProject project = workspace.getRoot().getProject(createUniqueString());
+		IFolder sourceParent = project.getFolder("source_parent");
+		IFolder destinationParent = project.getFolder("destination_parent");
+		// this file will be made irremovable
+		IFile sourceFile = sourceParent.getFile("file1.txt");
+		IFile destinationFile = destinationParent.getFile(sourceFile.getName());
 
-			// add a marker to a file to ensure the move operation is not losing anything
-			String attributeKey = getRandomString();
-			String attributeValue = getRandomString();
-			long markerId = -1;
-			try {
-				IMarker bookmark = null;
-				bookmark = sourceFile.createMarker(IMarker.BOOKMARK);
-				bookmark.setAttribute(attributeKey, attributeValue);
-				markerId = bookmark.getId();
-			} catch (CoreException e) {
-				fail("0.1", e);
-			}
+		createInWorkspace(new IResource[] { sourceFile, destinationParent });
+		workspaceRule.deleteOnTearDown(project.getLocation());
 
-			// opens the file so it cannot be removed on Windows
-			try {
-				input = sourceFile.getContents();
-			} catch (CoreException ce) {
-				fail("1.0");
-			}
+		// add a marker to a file to ensure the move operation is not losing anything
+		String attributeKey = createRandomString();
+		String attributeValue = createRandomString();
+		long markerId = -1;
+		IMarker bookmark = sourceFile.createMarker(IMarker.BOOKMARK);
+		bookmark.setAttribute(attributeKey, attributeValue);
+		markerId = bookmark.getId();
 
-			try {
-				sourceFile.move(destinationFile.getFullPath(), IResource.FORCE, getMonitor());
-				fail("2.0");
-			} catch (CoreException ce) {
-				// success
-			}
+		// opens the file so it cannot be removed on Windows
+		try (InputStream input = sourceFile.getContents()) {
+			assertThrows(CoreException.class,
+					() -> sourceFile.move(destinationFile.getFullPath(), IResource.FORCE, createTestMonitor()));
 
 			// the source parent is in sync
 			assertTrue("3.0", sourceParent.isSynchronized(IResource.DEPTH_INFINITE));
@@ -82,90 +89,52 @@ public class Bug_032076 extends ResourceTest {
 			assertTrue("3.4", destinationFile.exists());
 
 			// ensure marker info has not been lost
-			try {
-				IMarker marker = destinationFile.findMarker(markerId);
-				assertNotNull("3.6", marker);
-				assertEquals("3.7", attributeValue, marker.getAttribute(attributeKey));
-			} catch (CoreException e) {
-				fail("3.8", e);
-			}
+			IMarker marker = destinationFile.findMarker(markerId);
+			assertNotNull("3.6", marker);
+			assertEquals("3.7", attributeValue, marker.getAttribute(attributeKey));
 
 			// non-removable file has been moved (but not in file system - they are out-of-sync)
 			assertTrue("4.1", sourceFile.exists());
 			assertTrue("4.2", sourceFile.isSynchronized(IResource.DEPTH_ZERO));
 
 			// refresh the source parent
-			try {
-				sourceParent.refreshLocal(IResource.DEPTH_INFINITE, getMonitor());
-			} catch (CoreException e) {
-				fail("4.4");
-			}
+			sourceParent.refreshLocal(IResource.DEPTH_INFINITE, createTestMonitor());
 
 			// file is still found in source tree
 			assertTrue("4.7", sourceFile.exists());
-
-		} finally {
-			try {
-				if (input != null) {
-					input.close();
-				}
-			} catch (IOException e) {
-				fail("5.0", e);
-			} finally {
-				if (project != null) {
-					ensureDoesNotExistInFileSystem(project);
-				}
-			}
 		}
 	}
 
-	public void testFolderBugOnWindows() {
-		if (!OS.isWindows()) {
-			return;
-		}
+	@Test
+	public void testFolderBugOnWindows() throws Exception {
+		assumeTrue("only relevant on Windows", OS.isWindows());
 
-		InputStream input = null;
-		IProject project = null;
-		try {
-			IWorkspace workspace = getWorkspace();
-			project = workspace.getRoot().getProject(getUniqueString());
-			IFolder sourceParent = project.getFolder("source_parent");
-			IFolder destinationParent = project.getFolder("destination_parent");
-			IFolder folder = sourceParent.getFolder("folder");
-			IFolder destinationFolder = destinationParent.getFolder(folder.getName());
-			// this file will be made un-removable
-			IFile file1 = folder.getFile("file1.txt");
-			// but not this one
-			IFile file2 = folder.getFile("file2.txt");
+		IWorkspace workspace = getWorkspace();
+		IProject project = workspace.getRoot().getProject(createUniqueString());
+		IFolder sourceParent = project.getFolder("source_parent");
+		IFolder destinationParent = project.getFolder("destination_parent");
+		IFolder folder = sourceParent.getFolder("folder");
+		IFolder destinationFolder = destinationParent.getFolder(folder.getName());
+		// this file will be made un-removable
+		IFile file1 = folder.getFile("file1.txt");
+		// but not this one
+		IFile file2 = folder.getFile("file2.txt");
 
-			ensureExistsInWorkspace(new IResource[] {file1, file2, destinationParent}, true);
+		createInWorkspace(new IResource[] { file1, file2, destinationParent });
+		workspaceRule.deleteOnTearDown(project.getLocation());
 
-			// add a marker to a file to ensure the move operation is not losing anything
-			String attributeKey = getRandomString();
-			String attributeValue = getRandomString();
-			long markerId = -1;
-			try {
-				IMarker bookmark = null;
-				bookmark = file1.createMarker(IMarker.BOOKMARK);
-				bookmark.setAttribute(attributeKey, attributeValue);
-				markerId = bookmark.getId();
-			} catch (CoreException e) {
-				fail("0.1", e);
-			}
+		// add a marker to a file to ensure the move operation is not losing anything
+		String attributeKey = createRandomString();
+		String attributeValue = createRandomString();
+		long markerId = -1;
+		IMarker bookmark = file1.createMarker(IMarker.BOOKMARK);
+		bookmark.setAttribute(attributeKey, attributeValue);
+		markerId = bookmark.getId();
 
-			// opens a file so it (and its parent) cannot be removed on Windows
-			try {
-				input = file1.getContents();
-			} catch (CoreException ce) {
-				fail("1.0", ce);
-			}
-
-			try {
-				folder.move(destinationFolder.getFullPath(), IResource.FORCE, getMonitor());
-				fail("2.0");
-			} catch (CoreException ce) {
-				// success
-			}
+		// opens a file so it (and its parent) cannot be removed on Windows
+		try (InputStream input = file1.getContents()) {
+			assertThrows(CoreException.class,
+					() -> folder.move(destinationFolder.getFullPath(), IResource.FORCE, createTestMonitor()));
 
 			// the source parent is in sync
 			assertTrue("3.0", sourceParent.isSynchronized(IResource.DEPTH_INFINITE));
@@ -178,13 +147,9 @@ public class Bug_032076 extends ResourceTest {
 			assertTrue("3.5", destinationFolder.getFile(file2.getName()).exists());
 
 			// ensure marker info has not been lost
-			try {
-				IMarker marker = destinationFolder.getFile(file1.getName()).findMarker(markerId);
-				assertNotNull("3.6", marker);
-				assertEquals("3.7", attributeValue, marker.getAttribute(attributeKey));
-			} catch (CoreException e) {
-				fail("3.8", e);
-			}
+			IMarker marker = destinationFolder.getFile(file1.getName()).findMarker(markerId);
+			assertNotNull("3.6", marker);
+			assertEquals("3.7", attributeValue, marker.getAttribute(attributeKey));
 
 			// non-removable resources still exist in source
 			assertTrue("4.1", folder.exists());
@@ -193,78 +158,43 @@ public class Bug_032076 extends ResourceTest {
 			assertTrue("4.3", !file2.exists());
 
 			// refresh the source parent
-			try {
-				sourceParent.refreshLocal(IResource.DEPTH_INFINITE, getMonitor());
-			} catch (CoreException e) {
-				fail("4.4");
-			}
+			sourceParent.refreshLocal(IResource.DEPTH_INFINITE, createTestMonitor());
 
 			// non-removable resources still in source tree
 			assertTrue("4.6", folder.exists());
 			assertTrue("4.7", file1.exists());
 			assertTrue("4.8", !file2.exists());
-
-		} finally {
-			try {
-				if (input != null) {
-					input.close();
-				}
-			} catch (IOException e) {
-				fail("5.0", e);
-			} finally {
-				if (project != null) {
-					ensureDoesNotExistInFileSystem(project);
-				}
-			}
 		}
 	}
 
-	public void testProjectBugOnWindows() {
-		if (!OS.isWindows()) {
-			return;
-		}
+	@Test
+	public void testProjectBugOnWindows() throws Exception {
+		assumeTrue("only relevant on Windows", OS.isWindows());
 
-		IProject sourceProject = null;
-		IProject destinationProject = null;
-		InputStream input = null;
-		try {
-			IWorkspace workspace = getWorkspace();
-			sourceProject = workspace.getRoot().getProject(getUniqueString() + ".source");
-			destinationProject = workspace.getRoot().getProject(getUniqueString() + ".dest");
-			// this file will be made un-removable
-			IFile file1 = sourceProject.getFile("file1.txt");
-			// but not this one
-			IFile file2 = sourceProject.getFile("file2.txt");
+		IWorkspace workspace = getWorkspace();
+		IProject sourceProject = workspace.getRoot().getProject(createUniqueString() + ".source");
+		IProject destinationProject = workspace.getRoot().getProject(createUniqueString() + ".dest");
+		// this file will be made un-removable
+		IFile file1 = sourceProject.getFile("file1.txt");
+		// but not this one
+		IFile file2 = sourceProject.getFile("file2.txt");
 
-			ensureExistsInWorkspace(new IResource[] {file1, file2}, true);
+		createInWorkspace(new IResource[] {file1, file2});
+		workspaceRule.deleteOnTearDown(sourceProject.getLocation()); // Ensure project location is moved after test
 
-			// add a marker to a file to ensure the move operation is not losing anything
-			String attributeKey = getRandomString();
-			String attributeValue = getRandomString();
-			long markerId = -1;
-			try {
-				IMarker bookmark = null;
-				bookmark = file1.createMarker(IMarker.BOOKMARK);
-				bookmark.setAttribute(attributeKey, attributeValue);
-				markerId = bookmark.getId();
-			} catch (CoreException e) {
-				fail("0.1", e);
-			}
+		// add a marker to a file to ensure the move operation is not losing anything
+		String attributeKey = createRandomString();
+		String attributeValue = createRandomString();
+		long markerId = -1;
+		IMarker bookmark = file1.createMarker(IMarker.BOOKMARK);
+		bookmark.setAttribute(attributeKey, attributeValue);
+		markerId = bookmark.getId();
 
-			// opens a file so it (and its parent) cannot be removed on Windows
-			try {
-				input = file1.getContents();
-			} catch (CoreException ce) {
-				fail("1.0", ce);
-			}
+		// opens a file so it (and its parent) cannot be removed on Windows
+		try (InputStream input = file1.getContents()) {
 
-			try {
-				deleteOnTearDown(sourceProject.getLocation()); // Ensure project location is moved after test
-				sourceProject.move(destinationProject.getFullPath(), IResource.FORCE, getMonitor());
-				fail("2.0");
-			} catch (CoreException ce) {
-				// success
-			}
+			assertThrows(CoreException.class,
+					() -> sourceProject.move(destinationProject.getFullPath(), IResource.FORCE, createTestMonitor()));
 
 			// the source does not exist
 			assertTrue("3.0", !sourceProject.exists());
@@ -278,72 +208,45 @@ public class Bug_032076 extends ResourceTest {
 			assertTrue("3.5", destinationProject.getFile(file2.getProjectRelativePath()).exists());
 
 			// ensure marker info has not been lost
-			try {
-				IMarker marker = destinationProject.getFile(file1.getProjectRelativePath()).findMarker(markerId);
-				assertNotNull("3.6", marker);
-				assertEquals("3.7", attributeValue, marker.getAttribute(attributeKey));
-			} catch (CoreException e) {
-				fail("3.8", e);
-			}
-
+			IMarker marker = destinationProject.getFile(file1.getProjectRelativePath()).findMarker(markerId);
+			assertNotNull("3.6", marker);
+			assertEquals("3.7", attributeValue, marker.getAttribute(attributeKey));
 			assertTrue("5.0", workspace.getRoot().isSynchronized(IResource.DEPTH_INFINITE));
-
-		} finally {
-			try {
-				if (input != null) {
-					input.close();
-				}
-			} catch (IOException e) {
-				fail("6.0", e);
-			}
 		}
 	}
 
-	/**
-	 * TODO: This test is currently failing and needs further investigation (bug 203078)
-	 */
-	public void _testFileBugOnLinux() {
-		if (!(OS.isLinux() && isReadOnlySupported())) {
-			return;
-		}
+	@Test
+	@Ignore("test is currently failing and needs further investigation (bug 203078)")
+	public void testFileBugOnLinux() throws CoreException {
+		assumeTrue("only relevant on Linux", OS.isLinux() && isReadOnlySupported());
 
-		IFileStore roFolderStore = null;
-		IProject project = null;
+		IWorkspace workspace = getWorkspace();
+		IProject project = workspace.getRoot().getProject(createUniqueString());
+		IFolder sourceParent = project.getFolder("source_parent");
+		IFolder roFolder = sourceParent.getFolder("sub-folder");
+		IFolder destinationParent = project.getFolder("destination_parent");
+		// this file will be made un-removable
+		IFile sourceFile = roFolder.getFile("file.txt");
+		IFile destinationFile = destinationParent.getFile("file.txt");
+
+		createInWorkspace(new IResource[] { sourceFile, destinationParent });
+		workspaceRule.deleteOnTearDown(project.getLocation());
+
+		IFileStore roFolderStore = ((Resource) roFolder).getStore();
+
+		// add a marker to a file to ensure the move operation is not losing anything
+		String attributeKey = createRandomString();
+		String attributeValue = createRandomString();
+		long markerId = -1;
+		IMarker bookmark = sourceFile.createMarker(IMarker.BOOKMARK);
+		bookmark.setAttribute(attributeKey, attributeValue);
+		markerId = bookmark.getId();
+
 		try {
-			IWorkspace workspace = getWorkspace();
-			project = workspace.getRoot().getProject(getUniqueString());
-			IFolder sourceParent = project.getFolder("source_parent");
-			IFolder roFolder = sourceParent.getFolder("sub-folder");
-			IFolder destinationParent = project.getFolder("destination_parent");
-			// this file will be made un-removable
-			IFile sourceFile = roFolder.getFile("file.txt");
-			IFile destinationFile = destinationParent.getFile("file.txt");
-
-			ensureExistsInWorkspace(new IResource[] {sourceFile, destinationParent}, true);
-
-			roFolderStore = ((Resource) roFolder).getStore();
-
-			// add a marker to a file to ensure the move operation is not losing anything
-			String attributeKey = getRandomString();
-			String attributeValue = getRandomString();
-			long markerId = -1;
-			try {
-				IMarker bookmark = null;
-				bookmark = sourceFile.createMarker(IMarker.BOOKMARK);
-				bookmark.setAttribute(attributeKey, attributeValue);
-				markerId = bookmark.getId();
-			} catch (CoreException e) {
-				fail("0.1", e);
-			}
-
 			// mark sub-folder as read-only so its immediate children cannot be removed on Linux
 			setReadOnly(roFolder, true);
-			try {
-				sourceFile.move(destinationFile.getFullPath(), IResource.FORCE, getMonitor());
-				fail("2.0");
-			} catch (CoreException ce) {
-				// success
-			}
+			assertThrows(CoreException.class,
+					() -> sourceFile.move(destinationFile.getFullPath(), IResource.FORCE, createTestMonitor()));
 
 			// the source parent is out-of-sync
 			assertTrue("3.0", !sourceParent.isSynchronized(IResource.DEPTH_INFINITE));
@@ -354,85 +257,58 @@ public class Bug_032076 extends ResourceTest {
 			assertTrue("3.4", destinationFile.exists());
 
 			// ensure marker info has not been lost
-			try {
-				IMarker marker = destinationFile.findMarker(markerId);
-				assertNotNull("3.6", marker);
-				assertEquals("3.7", attributeValue, marker.getAttribute(attributeKey));
-			} catch (CoreException e) {
-				fail("3.8", e);
-			}
+			IMarker marker = destinationFile.findMarker(markerId);
+			assertNotNull("3.6", marker);
+			assertEquals("3.7", attributeValue, marker.getAttribute(attributeKey));
 
 			// non-removable file has been moved (but not in file system - they are out-of-sync)
 			assertTrue("4.1", !sourceFile.exists());
 
 			// refresh the source parent
-			try {
-				sourceParent.refreshLocal(IResource.DEPTH_INFINITE, getMonitor());
-			} catch (CoreException e) {
-				fail("4.4");
-			}
+			sourceParent.refreshLocal(IResource.DEPTH_INFINITE, createTestMonitor());
 
 			// non-removable file now reappear in the resource tree
 			assertTrue("4.7", sourceFile.exists());
-
 		} finally {
-			if (roFolderStore != null) {
-				setReadOnly(roFolderStore, false);
-			}
-			if (project != null) {
-				ensureDoesNotExistInFileSystem(project);
-			}
+			setReadOnly(roFolderStore, false);
 		}
 	}
 
-	/**
-	 * TODO: This test is currently failing and needs further investigation (bug 203078)
-	 */
-	public void _testFolderBugOnLinux() {
-		if (!(OS.isLinux() && isReadOnlySupported())) {
-			return;
-		}
+	@Test
+	@Ignore("test is currently failing and needs further investigation (bug 203078)")
+	public void testFolderBugOnLinux() throws CoreException {
+		assumeTrue("only relevant on Linux", OS.isLinux() && isReadOnlySupported());
 
-		IFileStore roFolderLocation = null, destinationROFolderLocation = null;
-		IProject project = null;
+		IWorkspace workspace = getWorkspace();
+		IProject project = workspace.getRoot().getProject(createUniqueString());
+		IFolder sourceParent = project.getFolder("source_parent");
+		IFolder roFolder = sourceParent.getFolder("sub-folder");
+		IFolder folder = roFolder.getFolder("folder");
+		IFile file1 = roFolder.getFile("file1.txt");
+		IFile file2 = folder.getFile("file2.txt");
+		IFolder destinationParent = project.getFolder("destination_parent");
+		IFolder destinationROFolder = destinationParent.getFolder(roFolder.getName());
+
+		createInWorkspace(new IResource[] { file1, file2, destinationParent });
+		workspaceRule.deleteOnTearDown(project.getLocation());
+
+		IFileStore roFolderLocation = ((Resource) roFolder).getStore();
+		IFileStore destinationROFolderLocation = ((Resource) destinationROFolder).getStore();
+
+		// add a marker to a file to ensure the move operation is not losing anything
+		String attributeKey = createRandomString();
+		String attributeValue = createRandomString();
+		long markerId = -1;
+		IMarker bookmark = file1.createMarker(IMarker.BOOKMARK);
+		bookmark.setAttribute(attributeKey, attributeValue);
+		markerId = bookmark.getId();
+
 		try {
-			IWorkspace workspace = getWorkspace();
-			project = workspace.getRoot().getProject(getUniqueString());
-			IFolder sourceParent = project.getFolder("source_parent");
-			IFolder roFolder = sourceParent.getFolder("sub-folder");
-			IFolder folder = roFolder.getFolder("folder");
-			IFile file1 = roFolder.getFile("file1.txt");
-			IFile file2 = folder.getFile("file2.txt");
-			IFolder destinationParent = project.getFolder("destination_parent");
-			IFolder destinationROFolder = destinationParent.getFolder(roFolder.getName());
-
-			ensureExistsInWorkspace(new IResource[] {file1, file2, destinationParent}, true);
-
-			roFolderLocation = ((Resource) roFolder).getStore();
-			destinationROFolderLocation = ((Resource) destinationROFolder).getStore();
-
-			// add a marker to a file to ensure the move operation is not losing anything
-			String attributeKey = getRandomString();
-			String attributeValue = getRandomString();
-			long markerId = -1;
-			try {
-				IMarker bookmark = null;
-				bookmark = file1.createMarker(IMarker.BOOKMARK);
-				bookmark.setAttribute(attributeKey, attributeValue);
-				markerId = bookmark.getId();
-			} catch (CoreException e) {
-				fail("0.1", e);
-			}
-
 			// mark sub-folder as read-only so its immediate children cannot be removed on Linux
 			setReadOnly(roFolder, true);
 
-			try {
-				roFolder.move(destinationParent.getFullPath().append(roFolder.getName()), IResource.FORCE, getMonitor());
-				fail("2.0");
-			} catch (CoreException ce) {
-				// success
-			}
+			assertThrows(CoreException.class, () -> roFolder
+					.move(destinationParent.getFullPath().append(roFolder.getName()), IResource.FORCE, createTestMonitor()));
 
 			// the source parent is out-of-sync
 			assertTrue("3.0", !sourceParent.isSynchronized(IResource.DEPTH_INFINITE));
@@ -449,13 +325,9 @@ public class Bug_032076 extends ResourceTest {
 			assertTrue("3.6", destinationFile2.exists());
 
 			// ensure marker info has not been lost
-			try {
-				IMarker marker = destinationROFolder.getFile(file1.getName()).findMarker(markerId);
-				assertNotNull("3.7", marker);
-				assertEquals("3.8", attributeValue, marker.getAttribute(attributeKey));
-			} catch (CoreException e) {
-				fail("3.9", e);
-			}
+			IMarker marker = destinationROFolder.getFile(file1.getName()).findMarker(markerId);
+			assertNotNull("3.7", marker);
+			assertEquals("3.8", attributeValue, marker.getAttribute(attributeKey));
 
 			// non-removable resources have been moved (but not in file system - they are out-of-sync)
 			assertTrue("4.0", !roFolder.exists());
@@ -464,89 +336,58 @@ public class Bug_032076 extends ResourceTest {
 			assertTrue("4.3", !file2.exists());
 
 			// refresh the source parent
-			try {
-				sourceParent.refreshLocal(IResource.DEPTH_INFINITE, getMonitor());
-			} catch (CoreException e) {
-				fail("4.4");
-			}
+			sourceParent.refreshLocal(IResource.DEPTH_INFINITE, createTestMonitor());
 
 			// non-removed resources now reappear in the resource tree
 			assertTrue("4.5", roFolder.exists());
 			assertTrue("4.6", folder.exists());
 			assertTrue("4.7", file1.exists());
 			assertTrue("4.8", !file2.exists());
-
 		} finally {
-			if (roFolderLocation != null) {
-				setReadOnly(roFolderLocation, false);
-			}
-			if (destinationROFolderLocation != null) {
-				setReadOnly(destinationROFolderLocation, false);
-			}
-			if (project != null) {
-				ensureDoesNotExistInFileSystem(project);
-			}
+			setReadOnly(roFolderLocation, false);
+			setReadOnly(destinationROFolderLocation, false);
 		}
 	}
 
-	/**
-	 * TODO: This test is currently failing and needs further investigation (bug 203078)
-	 */
-	public void _testProjectBugOnLinux() {
-		if (!(OS.isLinux() && isReadOnlySupported())) {
-			return;
-		}
+	@Test
+	@Ignore("test is currently failing and needs further investigation (bug 203078)")
+	public void testProjectBugOnLinux() throws CoreException {
+		assumeTrue("only relevant on Linux", OS.isLinux() && isReadOnlySupported());
 
 		IWorkspace workspace = getWorkspace();
-		IProject sourceProject = workspace.getRoot().getProject(getUniqueString() + ".source");
-		IProject destinationProject = null;
-		IFileStore projectParentStore = getTempStore();
+		IProject sourceProject = workspace.getRoot().getProject(createUniqueString() + ".source");
+		IFileStore projectParentStore = workspaceRule.getTempStore();
 		IFileStore projectStore = projectParentStore.getChild(sourceProject.getName());
+		IProjectDescription sourceDescription = workspace.newProjectDescription(sourceProject.getName());
+		sourceDescription.setLocationURI(projectStore.toURI());
+
+		IProject destinationProject = workspace.getRoot().getProject(createUniqueString() + ".dest");
+		IProjectDescription destinationDescription = workspace.newProjectDescription(destinationProject.getName());
+
+		// create and open the source project at a non-default location
+		sourceProject.create(sourceDescription, createTestMonitor());
+		sourceProject.open(createTestMonitor());
+		workspaceRule.deleteOnTearDown(sourceProject.getLocation());
+
+		IFile file1 = sourceProject.getFile("file1.txt");
+
+		createInWorkspace(new IResource[] { file1 });
+
+		// add a marker to a file to ensure the move operation is not losing anything
+		String attributeKey = createRandomString();
+		String attributeValue = createRandomString();
+		long markerId = -1;
+		IMarker bookmark = file1.createMarker(IMarker.BOOKMARK);
+		bookmark.setAttribute(attributeKey, attributeValue);
+		markerId = bookmark.getId();
+
 		try {
-			IProjectDescription sourceDescription = workspace.newProjectDescription(sourceProject.getName());
-			sourceDescription.setLocationURI(projectStore.toURI());
-
-			destinationProject = workspace.getRoot().getProject(getUniqueString() + ".dest");
-			IProjectDescription destinationDescription = workspace.newProjectDescription(destinationProject.getName());
-
-			// create and open the source project at a non-default location
-			try {
-				sourceProject.create(sourceDescription, getMonitor());
-			} catch (CoreException e) {
-				fail("0.1", e);
-			}
-			try {
-				sourceProject.open(getMonitor());
-			} catch (CoreException e) {
-				fail("0.2", e);
-			}
-
-			IFile file1 = sourceProject.getFile("file1.txt");
-
-			ensureExistsInWorkspace(new IResource[] {file1}, true);
-
-			// add a marker to a file to ensure the move operation is not losing anything
-			String attributeKey = getRandomString();
-			String attributeValue = getRandomString();
-			long markerId = -1;
-			try {
-				IMarker bookmark = null;
-				bookmark = file1.createMarker(IMarker.BOOKMARK);
-				bookmark.setAttribute(attributeKey, attributeValue);
-				markerId = bookmark.getId();
-			} catch (CoreException e) {
-				fail("0.5", e);
-			}
-
 			// mark sub-folder as read-only so its immediate children cannot be removed on Linux
 			setReadOnly(projectParentStore, true);
 
-			try {
-				sourceProject.move(destinationDescription, IResource.FORCE, getMonitor());
-				fail("2.0");
-			} catch (CoreException ce) {
-				// success
-			}
+			assertThrows(CoreException.class,
+					() -> sourceProject.move(destinationDescription, IResource.FORCE, createTestMonitor()));
+			workspaceRule.deleteOnTearDown(destinationProject.getLocation());
 
 			// the source does not exist
 			assertTrue("3.0", !sourceProject.exists());
@@ -558,24 +399,16 @@ public class Bug_032076 extends ResourceTest {
 			assertTrue("3.4", destinationProject.getFile(file1.getProjectRelativePath()).exists());
 
 			// ensure marker info has not been lost
-			try {
-				IMarker marker = destinationProject.getFile(file1.getProjectRelativePath()).findMarker(markerId);
-				assertNotNull("3.6", marker);
-				assertEquals("3.7", attributeValue, marker.getAttribute(attributeKey));
-			} catch (CoreException e) {
-				fail("3.8", e);
-			}
+			IMarker marker = destinationProject.getFile(file1.getProjectRelativePath()).findMarker(markerId);
+			assertNotNull("3.6", marker);
+			assertEquals("3.7", attributeValue, marker.getAttribute(attributeKey));
 			// project's content area still exists in file system
 			assertTrue("4.0", projectStore.fetchInfo().exists());
 
 			assertTrue("5.0", workspace.getRoot().isSynchronized(IResource.DEPTH_INFINITE));
-
 		} finally {
 			setReadOnly(projectParentStore, false);
-			ensureDoesNotExistInFileSystem(sourceProject);
-			if (destinationProject != null) {
-				ensureDoesNotExistInFileSystem(destinationProject);
-			}
 		}
 	}
+
 }

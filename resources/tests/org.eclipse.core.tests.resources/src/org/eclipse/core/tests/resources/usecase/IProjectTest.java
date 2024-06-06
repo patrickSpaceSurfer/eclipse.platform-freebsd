@@ -14,7 +14,16 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.usecase;
 
-import java.util.Arrays;
+import static java.util.function.Predicate.not;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.usecase.IResourceTestUtil.PROJECT;
+import static org.eclipse.core.tests.resources.usecase.IResourceTestUtil.Q_NAME_SESSION;
+import static org.eclipse.core.tests.resources.usecase.IResourceTestUtil.STRING_VALUE;
+import static org.eclipse.core.tests.resources.usecase.IResourceTestUtil.commonFailureTestsForResource;
+import static org.eclipse.core.tests.resources.usecase.IResourceTestUtil.isLocal;
+import static org.junit.Assert.assertThrows;
+
 import java.util.Hashtable;
 import org.eclipse.core.resources.ICommand;
 import org.eclipse.core.resources.IProject;
@@ -24,13 +33,20 @@ import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 
-public class IProjectTest extends IResourceTest {
+public class IProjectTest {
+
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
+
 	public static String LOCAL_LOCATION_PATH_STRING_0;
 
-	@Override
-	protected void setUp() throws Exception {
-		super.setUp();
+	@Before
+	public void setUp() {
 		LOCAL_LOCATION_PATH_STRING_0 = getWorkspace().getRoot().getLocation().append("temp/location0").toOSString();
 	}
 
@@ -40,19 +56,10 @@ public class IProjectTest extends IResourceTest {
 	 * Set methods throw an exception.
 	 */
 	protected void commonFailureTests(IProject proj, boolean created) {
-		// Prefix to assertion messages.
-		String method = "commonFailureTests(IProject," + (created ? "CREATED" : "NONEXISTENT") + "): ";
-
 		// Tests for failure in get/set methods in IResource.
 		commonFailureTestsForResource(proj, created);
-
 		// Description
-		try {
-			proj.getDescription();
-			fail(method + "4.1");
-		} catch (CoreException e) {
-			// expected
-		}
+		assertThrows(CoreException.class, () -> proj.getDescription());
 	}
 
 	/**
@@ -61,31 +68,20 @@ public class IProjectTest extends IResourceTest {
 	 * Set methods throw an exception.
 	 */
 	protected void nonexistentProjectFailureTests(IProject proj) {
-		String method = "nonexistentProjectFailureTests(IProject,ISolution,IWorkspace): ";
 		commonFailureTests(proj, false);
 		IProgressMonitor monitor = null;
 
 		IWorkspace wb = getWorkspace();
 
 		// Try to open a non-created project.
-		try {
-			proj.open(monitor);
-			fail(method + "0.0");
-		} catch (CoreException e) {
-			// expected
-		}
-		assertTrue(method + "0.1", !proj.isOpen());
+		assertThrows(CoreException.class, () -> proj.open(monitor));
+		assertThat(proj).matches(not(IProject::isOpen), "is not open");
 
 		// addMapping
-		try {
-			// Project must exist.
-			proj.getDescription().setLocation(IPath.fromOSString(LOCAL_LOCATION_PATH_STRING_0));
-			fail(method + "1");
-		} catch (Exception e) {
-			// expected
-		}
+		assertThrows(Exception.class,
+				() -> proj.getDescription().setLocation(IPath.fromOSString(LOCAL_LOCATION_PATH_STRING_0)));
 
-		assertTrue(method + "2.1", wb.getRoot().getProjects().length == 0);
+		assertThat(wb.getRoot().getProjects()).isEmpty();
 	}
 
 	/**
@@ -113,97 +109,65 @@ public class IProjectTest extends IResourceTest {
 	 * Test IResource API
 	 * Test IFolder API
 	 */
-	public void testProject() {
-		IWorkspace wb = getWorkspace();
+	@Test
+	public void testProject() throws CoreException {
+		IWorkspace workspace = getWorkspace();
 		IProgressMonitor monitor = null;
 
 		// Create a project handle.
-		IProject proj = wb.getRoot().getProject(PROJECT);
+		IProject proj = workspace.getRoot().getProject(PROJECT);
 
 		// Inspection methods with meaningful results invoked on a handle for a nonexistent project
-		assertTrue("1.1", !proj.exists());
-		assertTrue("1.2", proj.getWorkspace().equals(wb));
-		assertTrue("1.4", proj.getType() == IResource.PROJECT);
-		assertTrue("1.5", proj.getFullPath().equals(IPath.fromOSString("/" + PROJECT)));
-		assertTrue("1.6", proj.getName().equals(PROJECT));
-		assertTrue("1.9", !wb.getRoot().exists(proj.getFullPath()));
-		assertTrue("1.11", wb.getRoot().findMember(proj.getFullPath()) == null);
-		assertTrue("1.12", proj.getParent().equals(wb.getRoot()));
+		assertThat(proj).matches(not(IProject::exists), "does not exist");
+		assertThat(proj.getWorkspace()).isEqualTo(workspace);
+		assertThat(proj.getType()).isEqualTo(IResource.PROJECT);
+		assertThat(proj.getFullPath()).isEqualTo(IPath.fromOSString("/" + PROJECT));
+		assertThat(proj.getName()).isEqualTo(PROJECT);
+		assertThat(proj).matches(it -> !workspace.getRoot().exists(it.getFullPath()), "is not contained in workspace");
+		assertThat(workspace.getRoot().findMember(proj.getFullPath())).isNull();
+		assertThat(proj.getParent()).isEqualTo(workspace.getRoot());
 		// Legal question inherited from IResource: returns the receiver.
-		assertTrue("1.13", proj.getProject().equals(proj));
-		assertTrue("1.14", proj.getProjectRelativePath().equals(IPath.fromOSString("")));
+		assertThat(proj.getProject()).isEqualTo(proj);
+		assertThat(proj.getProjectRelativePath()).isEqualTo(IPath.fromOSString(""));
 
 		// Check that there are no projects.
-		assertTrue("6.1", wb.getRoot().getProjects().length == 0);
+		assertThat(workspace.getRoot().getProjects()).isEmpty();
 
 		// These tests produce failure because the project does not exist yet.
 		nonexistentProjectFailureTests(proj);
 
 		// Create the project.
-		try {
-			proj.create(monitor);
-		} catch (CoreException e) {
-			fail("8");
-		}
+		proj.create(monitor);
 
-		// Check that the project is get-able from the containers.
-		assertTrue("9.0", proj.exists());
-		assertTrue("9.1", wb.getRoot().findMember(proj.getName()).exists());
-		assertTrue("9.3", wb.getRoot().exists(proj.getFullPath()));
-		// But it is still not open.
-		assertTrue("9.4", !proj.isOpen());
-		assertTrue("9.5", wb.getRoot().findMember(proj.getFullPath()).equals(proj));
+		// Check that the project is get-able from the containers but still not open
+		assertThat(proj).matches(IProject::exists, "exists")
+				.matches(it -> workspace.getRoot().exists(it.getFullPath()), "is contained in workspace")
+				.matches(it -> workspace.getRoot().findMember(it.getFullPath()).exists(),
+						"is found existing in workspace")
+				.isEqualTo(workspace.getRoot().findMember(proj.getFullPath()))
+				.matches(not(IProject::isOpen), "is open");
 
 		// These tests produce failure because the project has not been opened yet.
 		unopenedProjectFailureTests(proj);
 
 		// Open project
-		try {
-			proj.open(monitor);
-		} catch (CoreException e) {
-			fail("11.0", e);
-		}
-		assertTrue("11.1", proj.isOpen());
-		assertTrue("11.2", proj.getLocation() != null);
+		proj.open(monitor);
+		assertThat(proj).matches(IProject::isOpen, "is open");
+		assertThat(proj.getLocation()).isNotNull();
 
 		/* Properties */
 
 		// Session Property
-		try {
-			assertTrue("12.0", proj.getSessionProperty(Q_NAME_SESSION) == null);
-		} catch (CoreException e) {
-			fail("12.1");
-		}
-		try {
-			proj.setSessionProperty(Q_NAME_SESSION, STRING_VALUE);
-		} catch (CoreException e) {
-			fail("12.2");
-		}
-		try {
-			assertTrue("12.3", proj.getSessionProperty(Q_NAME_SESSION).equals(STRING_VALUE));
-		} catch (CoreException e) {
-			fail("12.4");
-		}
-		try {
-			proj.setSessionProperty(Q_NAME_SESSION, null);
-		} catch (CoreException e) {
-			fail("12.5");
-		}
-		try {
-			assertTrue("12.6", proj.getSessionProperty(Q_NAME_SESSION) == null);
-		} catch (CoreException e) {
-			fail("12.7");
-		}
+		assertThat(proj.getSessionProperty(Q_NAME_SESSION)).isNull();
+		proj.setSessionProperty(Q_NAME_SESSION, STRING_VALUE);
+		assertThat(proj.getSessionProperty(Q_NAME_SESSION)).isEqualTo(STRING_VALUE);
+		proj.setSessionProperty(Q_NAME_SESSION, null);
+		assertThat(proj.getSessionProperty(Q_NAME_SESSION)).isNull();
 
 		// Project buildspec
-		IProjectDescription desc = null;
-		try {
-			desc = proj.getDescription();
-		} catch (CoreException e) {
-			fail("14.0");
-		}
+		IProjectDescription desc = proj.getDescription();
 
-		assertTrue("15.1", desc.getBuildSpec().length == 0);
+		assertThat(desc.getBuildSpec()).isEmpty();
 		ICommand command = desc.newCommand();
 		command.setBuilderName("org.eclipse.core.tests.buildername");
 		ICommand[] commands = new ICommand[] {command};
@@ -214,43 +178,35 @@ public class IProjectTest extends IResourceTest {
 		desc.setBuildSpec(commands);
 
 		// Compare project buildspecs
-		assertTrue("15.5", Arrays.deepEquals(desc.getBuildSpec(), commands));
+		assertThat(commands).isEqualTo(desc.getBuildSpec());
 
 		// IResource.isLocal(int)
-		assertTrue("18.0", proj.isLocal(IResource.DEPTH_ZERO));
-		assertTrue("18.1", proj.isLocal(IResource.DEPTH_ONE));
-		assertTrue("18.2", proj.isLocal(IResource.DEPTH_INFINITE));
+		assertThat(proj).matches(it -> isLocal(it, IResource.DEPTH_ZERO), "is locally available")
+				// No kids, but it should still answer yes.
+				.matches(it -> isLocal(it, IResource.DEPTH_ONE), "is locally available with direct children")
+				.matches(it -> isLocal(it, IResource.DEPTH_INFINITE), "is locally available with all children");
 
 		// Close project
-		try {
-			proj.close(monitor);
-		} catch (CoreException e) {
-			fail("19.0", e);
-		}
-		// The project is no longer open
-		assertTrue("19.1", !proj.isOpen());
-		// But it still exists.
-		assertTrue("19.2", proj.exists());
-		assertTrue("19.5", wb.getRoot().findMember(proj.getFullPath()).equals(proj));
-		assertTrue("19.6", wb.getRoot().exists(proj.getFullPath()));
+		proj.close(monitor);
+		// The project is no longer open but still exists
+		assertThat(proj).matches(not(IProject::isOpen), "is not open") //
+				.matches(IProject::exists, "exists")
+				.matches(it -> workspace.getRoot().exists(it.getFullPath()), "is contained in workspace")
+				.isEqualTo(workspace.getRoot().findMember(proj.getFullPath()));
 
 		// These tests produce failure because the project is now closed.
 		unopenedProjectFailureTests(proj);
 
 		// Delete the project
-		try {
-			proj.delete(true, true, monitor);
-		} catch (CoreException e) {
-			fail("20.0", e);
-		}
+		proj.delete(true, true, monitor);
 
 		// The project no longer exists.
-		assertTrue("20.1", !proj.exists());
-		assertTrue("20.2", wb.getRoot().getProjects().length == 0);
-		assertTrue("20.4", wb.getRoot().findMember(proj.getFullPath()) == null);
+		assertThat(proj).matches(not(IProject::exists), "does not exist");
+		assertThat(workspace.getRoot().getProjects()).isEmpty();
+		assertThat(workspace.getRoot().findMember(proj.getFullPath())).isNull();
 		// These tests produce failure because the project no longer exists.
 		nonexistentProjectFailureTests(proj);
-		assertTrue("20.5", !wb.getRoot().exists(proj.getFullPath()));
+		assertThat(proj).matches(it -> !workspace.getRoot().exists(it.getFullPath()), "is not contained in workspace");
 	}
 
 	/**
@@ -262,18 +218,11 @@ public class IProjectTest extends IResourceTest {
 		commonFailureTests(proj, true);
 	}
 
-	protected void unopenedSolutionFailureTests(IProject proj, IWorkspace wb) {
-		String method = "unopenedSolutionFailureTests(IProject,IWorkspace): ";
-		IProgressMonitor monitor = null;
-
+	protected void unopenedSolutionFailureTests(IProject proj, IWorkspace workspace) {
 		// Try to create the project without the solution being open.
-		try {
-			proj.create(monitor);
-			fail(method + "1");
-		} catch (CoreException e) {
-			// expected
-		}
-		assertTrue(method + "2", !proj.exists());
-		assertTrue(method + "3", !wb.getRoot().exists(proj.getFullPath()));
+		assertThrows(CoreException.class, () -> proj.create(null));
+		assertThat(proj).matches(not(IProject::exists), "does not exist");
+		assertThat(proj).matches(it -> workspace.getRoot().exists(it.getFullPath()), "is contained in workspace");
 	}
+
 }

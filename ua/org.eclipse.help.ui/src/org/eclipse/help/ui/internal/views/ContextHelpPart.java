@@ -74,6 +74,7 @@ import org.eclipse.ui.forms.events.ExpansionAdapter;
 import org.eclipse.ui.forms.events.ExpansionEvent;
 import org.eclipse.ui.forms.events.HyperlinkEvent;
 import org.eclipse.ui.forms.events.IHyperlinkListener;
+import org.eclipse.ui.forms.widgets.ExpandableComposite;
 import org.eclipse.ui.forms.widgets.FormText;
 import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.eclipse.ui.forms.widgets.Section;
@@ -107,10 +108,6 @@ public class ContextHelpPart extends SectionPart implements IHelpPart {
 
 	private String savedDescription;
 
-	/**
-	 * @param parent
-	 * @param toolkit
-	 */
 	public ContextHelpPart(Composite parent, FormToolkit toolkit) {
 		super(parent, toolkit, getSectionStyle());
 		Section section = getSection();
@@ -185,9 +182,9 @@ public class ContextHelpPart extends SectionPart implements IHelpPart {
 	}
 
 	private static int getSectionStyle() {
-		int style = Section.EXPANDED ;
+		int style = ExpandableComposite.EXPANDED ;
 		if (RelatedTopicsPart.isUseDynamicHelp()) {
-			style = style | Section.TWISTIE;
+			style = style | ExpandableComposite.TWISTIE;
 		}
 		return style;
 	}
@@ -681,9 +678,6 @@ public class ContextHelpPart extends SectionPart implements IHelpPart {
 	/**
 	 * Make sure to support the Help system bold tag. The help system returns a
 	 * regular string for getText(). Use internal apis for now to get bold.
-	 *
-	 * @param context
-	 * @return
 	 */
 	private String decodeContextBoldTags(IContext context) {
 		String styledText;

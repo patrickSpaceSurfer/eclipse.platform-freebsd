@@ -13,8 +13,7 @@
  *******************************************************************************/
 package org.eclipse.debug.tests.console;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -24,6 +23,10 @@ import java.io.PipedOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import org.eclipse.debug.core.IBinaryStreamListener;
 import org.eclipse.debug.core.IStreamListener;
@@ -32,6 +35,7 @@ import org.eclipse.debug.core.model.IStreamMonitor;
 import org.eclipse.debug.internal.core.OutputStreamMonitor;
 import org.eclipse.debug.tests.AbstractDebugTest;
 import org.eclipse.debug.tests.TestUtil;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -39,41 +43,76 @@ import org.junit.Test;
  * Tests the {@link OutputStreamMonitor}.
  */
 public class OutputStreamMonitorTests extends AbstractDebugTest {
+	private static final Duration TIMEOUT = Duration.ofSeconds(10);
 
-	/** Stream to simulate an application writing to system out. */
-	PipedOutputStream sysout = new PipedOutputStream();
 	/** The {@link OutputStreamMonitor} used for the test runs. */
 	TestOutputStreamMonitor monitor;
-	/** The bytes received through listener. */
-	ByteArrayOutputStream notifiedBytes = new ByteArrayOutputStream();
-	/** The strings received through listener. */
-	StringBuilder notifiedChars = new StringBuilder();
+	/** Stream to simulate an application writing to system out. */
+	PipedOutputStream sysout;
+	PipedInputStream inputFromSysout;
 
-	IBinaryStreamListener fBinaryListener = new IBinaryStreamListener() {
+	private class BinaryListener implements IBinaryStreamListener {
+		/** The bytes received through listener. */
+		private volatile ByteArrayOutputStream recordedBytes = new ByteArrayOutputStream();
+
+		private final List<IOException> exceptions = Collections.synchronizedList(new ArrayList<>());
+
 		@Override
 		public void streamAppended(byte[] data, IBinaryStreamMonitor mon) {
 			if (monitor == mon) {
 				try {
-					notifiedBytes.write(data);
+					recordedBytes.write(data);
 				} catch (IOException e) {
+					exceptions.add(e);
 				}
 			}
 		}
-	};
-	IStreamListener fStreamListener = new IStreamListener() {
+
+		public void waitForBytes(int numberOfBytes) throws Exception {
+			TestUtil.waitWhile(() -> recordedBytes.size() < numberOfBytes, TIMEOUT.toMillis());
+		}
+
+		public byte[] getRecordedBytes() {
+			return recordedBytes.toByteArray();
+		}
+
+		public void assertNoExceptions() {
+			assertThat(exceptions).isEmpty();
+		}
+	}
+
+	private class StreamListener implements IStreamListener {
+		/** The strings received through listener. */
+		private volatile StringBuilder recordedChars = new StringBuilder();
+
 		@Override
 		public void streamAppended(String text, IStreamMonitor mon) {
 			if (monitor == mon) {
-				notifiedChars.append(text);
+				recordedChars.append(text);
 			}
 		}
-	};
 
-	@Override
+		public void waitForBytes(int numberOfChars) throws Exception {
+			TestUtil.waitWhile(() -> recordedChars.length() < numberOfChars, TIMEOUT.toMillis());
+		}
+
+		public String getRecordedChars() {
+			return recordedChars.toString();
+		}
+	}
+
 	@Before
-	@SuppressWarnings("resource")
-	public void setUp() throws IOException {
-		monitor = new TestOutputStreamMonitor(new PipedInputStream(sysout), StandardCharsets.UTF_8);
+	public void setupStreams() throws IOException {
+		sysout = new PipedOutputStream();
+		inputFromSysout = new PipedInputStream(sysout);
+		monitor = new TestOutputStreamMonitor(inputFromSysout, StandardCharsets.UTF_8);
+	}
+
+	@After
+	public void closeStreams() throws IOException {
+		inputFromSysout.close();
+		sysout.close();
+		monitor.close();
 	}
 
 	/**
@@ -83,43 +122,49 @@ public class OutputStreamMonitorTests extends AbstractDebugTest {
 	public void testBufferedOutputStreamMonitor() throws Exception {
 		String input = "o\u00F6O";
 		byte[] byteInput = input.getBytes(StandardCharsets.UTF_8);
-		try {
-			monitor.addBinaryListener(fBinaryListener);
-			monitor.addListener(fStreamListener);
 
-			sysout.write(byteInput, 0, 2);
-			sysout.flush();
-			monitor.startMonitoring();
-			TestUtil.waitWhile(() -> notifiedBytes.size() < 2, 1000);
-			String contents = monitor.getContents();
-			assertEquals("Monitor read wrong content.", input.substring(0, 1), contents);
-			assertEquals("Notified and buffered content differ.", contents, notifiedChars.toString());
-			assertEquals("Failed to access buffered content twice.", contents, monitor.getContents());
-			byte[] data = monitor.getData();
-			byte[] expected = new byte[2];
-			System.arraycopy(byteInput, 0, expected, 0, 2);
-			assertArrayEquals("Monitor read wrong binary content.", expected, data);
-			assertArrayEquals("Notified and buffered binary content differ.", data, notifiedBytes.toByteArray());
-			assertArrayEquals("Failed to access buffered binary content twice.", data, monitor.getData());
+		BinaryListener binaryListener = new BinaryListener();
+		StreamListener streamListener = new StreamListener();
+		monitor.addBinaryListener(binaryListener);
+		monitor.addListener(streamListener);
 
-			monitor.flushContents();
-			sysout.write(byteInput, 2, byteInput.length - 2);
-			sysout.flush();
-			TestUtil.waitWhile(() -> notifiedBytes.size() < byteInput.length, 1000);
-			contents = monitor.getContents();
-			assertEquals("Monitor buffered wrong content.", input.substring(1), contents);
-			assertEquals("Failed to access buffered content twice.", contents, monitor.getContents());
-			assertEquals("Wrong content through listener.", input, notifiedChars.toString());
-			data = monitor.getData();
-			expected = new byte[byteInput.length - 2];
-			System.arraycopy(byteInput, 2, expected, 0, expected.length);
-			assertArrayEquals("Monitor read wrong binary content.", expected, data);
-			assertArrayEquals("Failed to access buffered binary content twice.", data, monitor.getData());
-			assertArrayEquals("Wrong binary content through listener.", byteInput, notifiedBytes.toByteArray());
-		} finally {
-			sysout.close();
-			monitor.close();
-		}
+		sysout.write(byteInput, 0, 2);
+		sysout.flush();
+		monitor.startMonitoring();
+		binaryListener.waitForBytes(2);
+		streamListener.waitForBytes(1);
+		String monitorContents = monitor.getContents();
+		assertThat(monitorContents).isEqualTo(input.substring(0, 1));
+		assertThat(streamListener.getRecordedChars()).isEqualTo(monitorContents);
+		String monitorContentsOnSecondAccess = monitor.getContents();
+		assertThat(monitorContentsOnSecondAccess).isEqualTo(monitorContents);
+		byte[] binaryMonitorData = monitor.getData();
+		byte[] expectedBinaryData = new byte[2];
+		System.arraycopy(byteInput, 0, expectedBinaryData, 0, 2);
+		assertThat(binaryMonitorData).isEqualTo(expectedBinaryData);
+		assertThat(binaryListener.getRecordedBytes()).isEqualTo(binaryMonitorData);
+		byte[] binaryMonitorDataOnSecondAccess = monitor.getData();
+		assertThat(binaryMonitorDataOnSecondAccess).isEqualTo(binaryMonitorData);
+
+		monitor.flushContents();
+		sysout.write(byteInput, 2, byteInput.length - 2);
+		sysout.flush();
+		binaryListener.waitForBytes(byteInput.length);
+		streamListener.waitForBytes(new String(byteInput).length());
+		monitorContents = monitor.getContents();
+		assertThat(monitorContents).isEqualTo(input.substring(1));
+		monitorContentsOnSecondAccess = monitor.getContents();
+		assertThat(monitorContentsOnSecondAccess).isEqualTo(monitorContents);
+		assertThat(streamListener.getRecordedChars()).isEqualTo(input);
+		binaryMonitorData = monitor.getData();
+		expectedBinaryData = new byte[byteInput.length - 2];
+		System.arraycopy(byteInput, 2, expectedBinaryData, 0, expectedBinaryData.length);
+		assertThat(binaryMonitorData).isEqualTo(expectedBinaryData);
+		binaryMonitorDataOnSecondAccess = monitor.getData();
+		assertThat(binaryMonitorDataOnSecondAccess).isEqualTo(binaryMonitorData);
+		assertThat(binaryListener.getRecordedBytes()).isEqualTo(byteInput);
+
+		binaryListener.assertNoExceptions();
 	}
 
 	/**
@@ -129,32 +174,34 @@ public class OutputStreamMonitorTests extends AbstractDebugTest {
 	public void testUnbufferedOutputStreamMonitor() throws Exception {
 		String input = "o\u00F6O";
 		byte[] byteInput = input.getBytes(StandardCharsets.UTF_8);
-		try {
-			monitor.addBinaryListener(fBinaryListener);
-			monitor.addListener(fStreamListener);
 
-			sysout.write(byteInput, 0, 2);
-			sysout.flush();
-			monitor.setBuffered(false);
-			monitor.startMonitoring();
-			TestUtil.waitWhile(() -> notifiedBytes.size() < 2, 1000);
-			assertEquals("Monitor read wrong content.", input.substring(0, 1), notifiedChars.toString());
-			byte[] expected = new byte[2];
-			System.arraycopy(byteInput, 0, expected, 0, 2);
-			assertArrayEquals("Monitor read wrong binary content.", expected, notifiedBytes.toByteArray());
+		BinaryListener binaryListener = new BinaryListener();
+		StreamListener streamListener = new StreamListener();
+		monitor.addBinaryListener(binaryListener);
+		monitor.addListener(streamListener);
 
-			monitor.flushContents();
-			sysout.write(byteInput, 2, byteInput.length - 2);
-			sysout.flush();
-			TestUtil.waitWhile(() -> notifiedBytes.size() < byteInput.length, 1000);
-			assertEquals("Wrong content through listener.", input, notifiedChars.toString());
-			expected = new byte[byteInput.length - 2];
-			System.arraycopy(byteInput, 2, expected, 0, expected.length);
-			assertArrayEquals("Wrong binary content through listener.", byteInput, notifiedBytes.toByteArray());
-		} finally {
-			sysout.close();
-			monitor.close();
-		}
+		sysout.write(byteInput, 0, 2);
+		sysout.flush();
+		monitor.setBuffered(false);
+		monitor.startMonitoring();
+		binaryListener.waitForBytes(2);
+		streamListener.waitForBytes(1);
+		assertThat(streamListener.getRecordedChars()).isEqualTo(input.substring(0, 1));
+		byte[] expected = new byte[2];
+		System.arraycopy(byteInput, 0, expected, 0, 2);
+		assertThat(binaryListener.getRecordedBytes()).isEqualTo(expected);
+
+		monitor.flushContents();
+		sysout.write(byteInput, 2, byteInput.length - 2);
+		sysout.flush();
+		binaryListener.waitForBytes(byteInput.length);
+		streamListener.waitForBytes(new String(byteInput).length());
+		assertThat(streamListener.getRecordedChars()).isEqualTo(input);
+		expected = new byte[byteInput.length - 2];
+		System.arraycopy(byteInput, 2, expected, 0, expected.length);
+		assertThat(binaryListener.getRecordedBytes()).isEqualTo(byteInput);
+
+		binaryListener.assertNoExceptions();
 	}
 
 	/**
@@ -169,20 +216,17 @@ public class OutputStreamMonitorTests extends AbstractDebugTest {
 		sysout = new PipedOutputStream();
 		monitor.close();
 		monitor = new TestOutputStreamMonitor(new PipedInputStream(sysout), null);
-		try {
-			monitor.addListener(fStreamListener);
-			monitor.startMonitoring();
-			try (PrintStream out = new PrintStream(sysout)) {
-				out.print(input);
-			}
-			sysout.flush();
 
-			TestUtil.waitWhile(() -> notifiedChars.length() < input.length(), 500);
-			assertEquals("Monitor read wrong content.", input, notifiedChars.toString());
-		} finally {
-			sysout.close();
-			monitor.close();
+		StreamListener streamListener = new StreamListener();
+		monitor.addListener(streamListener);
+		monitor.startMonitoring();
+		try (PrintStream out = new PrintStream(sysout)) {
+			out.print(input);
 		}
+		sysout.flush();
+
+		streamListener.waitForBytes(input.length());
+		assertThat(streamListener.getRecordedChars()).isEqualTo(input);
 	}
 
 	/**

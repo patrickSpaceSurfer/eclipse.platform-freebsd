@@ -39,6 +39,7 @@ import org.eclipse.jface.action.IAction;
 import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.preference.PreferenceDialog;
 import org.eclipse.jface.preference.PreferenceManager;
+import org.eclipse.jface.window.Window;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.KeyAdapter;
@@ -57,6 +58,7 @@ import org.eclipse.ui.forms.AbstractFormPart;
 import org.eclipse.ui.forms.IFormColors;
 import org.eclipse.ui.forms.events.HyperlinkAdapter;
 import org.eclipse.ui.forms.events.HyperlinkEvent;
+import org.eclipse.ui.forms.widgets.ExpandableComposite;
 import org.eclipse.ui.forms.widgets.FormText;
 import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.eclipse.ui.forms.widgets.Hyperlink;
@@ -64,6 +66,7 @@ import org.eclipse.ui.forms.widgets.Section;
 import org.eclipse.ui.forms.widgets.TableWrapData;
 import org.eclipse.ui.forms.widgets.TableWrapLayout;
 
+@SuppressWarnings("deprecation") // java.util.Observable since 9;
 public class SearchPart extends AbstractFormPart implements IHelpPart, IHelpUIConstants {
 
 	public class SearchScopeObserver implements Observer {
@@ -90,15 +93,12 @@ public class SearchPart extends AbstractFormPart implements IHelpPart, IHelpUICo
 	private static boolean SEARCH_HELP_AVAILABLE = false;
 
 	static {
-		InputStream is = HelpSystem.getHelpContent(HREF_SEARCH_HELP);
-		if (is != null) {
-			// don't leak the input stream
-			try {
-				is.close();
+		try (InputStream is = HelpSystem.getHelpContent(HREF_SEARCH_HELP)) {
+			if (is != null) {
 				SEARCH_HELP_AVAILABLE = true;
-			} catch (IOException e) {
-				// ignore
 			}
+		} catch (IOException e) {
+			// ignore
 		}
 	}
 
@@ -198,10 +198,6 @@ public class SearchPart extends AbstractFormPart implements IHelpPart, IHelpUICo
 		}
 	}
 
-	/**
-	 * @param parent
-	 * @param toolkit
-	 */
 	public SearchPart(final Composite parent, FormToolkit toolkit) {
 		this.toolkit = toolkit;
 		container = toolkit.createComposite(parent);
@@ -268,8 +264,8 @@ public class SearchPart extends AbstractFormPart implements IHelpPart, IHelpUICo
 
 	private void createScopeSection(FormToolkit toolkit) {
 		TableWrapData td;
-		scopeSection = toolkit.createSection(container, Section.TWISTIE | Section.COMPACT
-				| Section.LEFT_TEXT_CLIENT_ALIGNMENT);
+		scopeSection = toolkit.createSection(container, ExpandableComposite.TWISTIE | ExpandableComposite.COMPACT
+				| ExpandableComposite.LEFT_TEXT_CLIENT_ALIGNMENT);
 		scopeSection.setText(Messages.limit_to);
 		td = new TableWrapData();
 		td.colspan = 2;
@@ -288,8 +284,8 @@ public class SearchPart extends AbstractFormPart implements IHelpPart, IHelpUICo
 
 	private void createSearchExpressionSection(FormToolkit toolkit) {
 		TableWrapData td;
-		Section searchExpressionSection = toolkit.createSection(container, Section.TWISTIE | Section.COMPACT
-				| Section.LEFT_TEXT_CLIENT_ALIGNMENT);
+		Section searchExpressionSection = toolkit.createSection(container, ExpandableComposite.TWISTIE | ExpandableComposite.COMPACT
+				| ExpandableComposite.LEFT_TEXT_CLIENT_ALIGNMENT);
 		searchExpressionSection.setText(Messages.expression);
 		td = new TableWrapData();
 		td.colspan = 2;
@@ -322,8 +318,8 @@ public class SearchPart extends AbstractFormPart implements IHelpPart, IHelpUICo
 
 		container.setMenu(new Menu(container));
 
-		alternateQuerySection = toolkit.createSection(container, Section.TWISTIE | Section.COMPACT
-				| Section.LEFT_TEXT_CLIENT_ALIGNMENT);
+		alternateQuerySection = toolkit.createSection(container, ExpandableComposite.TWISTIE | ExpandableComposite.COMPACT
+				| ExpandableComposite.LEFT_TEXT_CLIENT_ALIGNMENT);
 		alternateQuerySection.setLayoutData(td);
 		alternateQuerySection.setText(Messages.AlternateQueries);
 
@@ -400,8 +396,7 @@ public class SearchPart extends AbstractFormPart implements IHelpPart, IHelpUICo
 
 	private void updateMasters(ScopeSet set) {
 		Control[] children = ((Composite) scopeSection.getClient()).getChildren();
-		for (int i = 0; i < children.length; i++) {
-			Control child = children[i];
+		for (Control child : children) {
 			if (child instanceof Button) {
 				Button master = (Button) child;
 				Object data = master.getData();
@@ -416,8 +411,7 @@ public class SearchPart extends AbstractFormPart implements IHelpPart, IHelpUICo
 	private void loadEngines(final Composite container, final FormToolkit toolkit) {
 		EngineDescriptorManager descManager = parent.getEngineManager();
 		EngineDescriptor[] descriptors = descManager.getDescriptors();
-		for (int i = 0; i < descriptors.length; i++) {
-			EngineDescriptor desc = descriptors[i];
+		for (EngineDescriptor desc : descriptors) {
 			loadEngine(desc, container, toolkit);
 		}
 		engineObserver = (o, arg) -> {
@@ -469,8 +463,7 @@ public class SearchPart extends AbstractFormPart implements IHelpPart, IHelpUICo
 	private void removeEngine(EngineDescriptor desc) {
 		boolean reflowNeeded = false;
 		Control[] children = ((Composite) scopeSection.getClient()).getChildren();
-		for (int i = 0; i < children.length; i++) {
-			Control child = children[i];
+		for (Control child : children) {
 			EngineDescriptor ed = (EngineDescriptor) child.getData();
 			if (ed == desc) {
 				child.setMenu(null);
@@ -536,8 +529,7 @@ public class SearchPart extends AbstractFormPart implements IHelpPart, IHelpUICo
 				toDelete.add(sset);
 			items.add(sset.getExpression());
 		}
-		for (int i = 0; i < toDelete.size(); i++) {
-			HistoryScopeSet sset = toDelete.get(i);
+		for (HistoryScopeSet sset : toDelete) {
 			scopeSetManager.remove(sset);
 		}
 		if (items.size() > 0)
@@ -576,8 +568,7 @@ public class SearchPart extends AbstractFormPart implements IHelpPart, IHelpUICo
 				.findPart(IHelpUIConstants.HV_FSEARCH_RESULT);
 		ArrayList<EngineDescriptor> eds = new ArrayList<>();
 		EngineDescriptor[] engineDescriptors = parent.getEngineManager().getDescriptors();
-		for (int i = 0; i < engineDescriptors.length; i++) {
-			final EngineDescriptor ed = engineDescriptors[i];
+		for (final EngineDescriptor ed : engineDescriptors) {
 			if (set.getEngineEnabled(ed) && ed.getEngine() != null) {
 				ISearchScope scope = ed.createSearchScope(set.getPreferenceStore());
 				FederatedSearchEntry entry = new FederatedSearchEntry(ed.getId(), ed.getLabel(), scope, ed
@@ -606,10 +597,9 @@ public class SearchPart extends AbstractFormPart implements IHelpPart, IHelpUICo
 									if (!alts.isEmpty())
 									{
 										createAlternateQueriesSection(toolkit);
-										for (int b=0;b<alts.size();b++)
-										{
+										for (String alt : alts) {
 											Hyperlink link = toolkit.createHyperlink(
-													alternateQueryComposite, alts.get(b), SWT.NONE);
+													alternateQueryComposite, alt, SWT.NONE);
 											link.addHyperlinkListener(new HyperlinkAdapter(){
 												@Override
 												public void linkActivated(HyperlinkEvent e) {
@@ -665,7 +655,7 @@ public class SearchPart extends AbstractFormPart implements IHelpPart, IHelpUICo
 		dialog.setInput(scopeSetManager);
 		dialog.create();
 		dialog.getShell().setText(Messages.ScopeSetDialog_wtitle);
-		if (dialog.open() == ScopeSetDialog.OK) {
+		if (dialog.open() == Window.OK) {
 			ScopeSet set = dialog.getActiveSet();
 			if (set != null) {
 				setActiveScopeSet(set);

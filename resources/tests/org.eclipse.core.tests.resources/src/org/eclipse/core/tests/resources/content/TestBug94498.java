@@ -13,37 +13,46 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.content;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.core.tests.resources.ResourceTestPluginConstants.PI_RESOURCES_TESTS;
+
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.content.IContentType;
 import org.eclipse.core.runtime.content.IContentTypeManager;
-import org.eclipse.core.tests.resources.AutomatedResourceTests;
-import org.eclipse.core.tests.session.WorkspaceSessionTestSuite;
+import org.eclipse.core.tests.harness.session.SessionTestExtension;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
-public class TestBug94498 extends TestCase {
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+public class TestBug94498 {
 
 	private static final String FILE_NAME = "foo.bar.zoo";
 
-	public static Test suite() {
-		return new WorkspaceSessionTestSuite(AutomatedResourceTests.PI_RESOURCES_TESTS, TestBug94498.class);
-	}
+	@RegisterExtension
+	static SessionTestExtension sessionTestExtension = SessionTestExtension.forPlugin(PI_RESOURCES_TESTS)
+			.withCustomization(SessionTestExtension.createCustomWorkspace()).create();
 
+	@Test
+	@Order(1)
 	public void test1() throws CoreException {
 		IContentType text = Platform.getContentTypeManager().getContentType(IContentTypeManager.CT_TEXT);
-		assertNotNull("1.0", text);
+		assertThat(text).isNotNull();
 		text.addFileSpec(FILE_NAME, IContentType.FILE_NAME_SPEC);
 		String[] fileSpecs = text.getFileSpecs(IContentType.FILE_NAME_SPEC | IContentType.IGNORE_PRE_DEFINED);
-		assertEquals("2.0", 1, fileSpecs.length);
-		assertEquals("2.1", FILE_NAME, fileSpecs[0]);
+		assertThat(fileSpecs).containsExactly(FILE_NAME);
 	}
 
+	@Test
+	@Order(2)
 	public void test2() {
 		IContentType text = Platform.getContentTypeManager().getContentType(IContentTypeManager.CT_TEXT);
-		assertNotNull("1.0", text);
+		assertThat(text).isNotNull();
 		String[] fileSpecs = text.getFileSpecs(IContentType.FILE_NAME_SPEC | IContentType.IGNORE_PRE_DEFINED);
-		assertEquals("2.0", 1, fileSpecs.length);
-		assertEquals("2.1", FILE_NAME, fileSpecs[0]);
+		assertThat(fileSpecs).containsExactly(FILE_NAME);
 	}
+
 }

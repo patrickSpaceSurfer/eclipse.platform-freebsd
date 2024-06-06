@@ -22,6 +22,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.text.MessageFormat;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import org.eclipse.core.resources.IFile;
@@ -225,7 +226,6 @@ public class LaunchConfigurationTabGroupViewer {
 	 * configuration currently being edited, as well as a tab folder of tabs
 	 * that are applicable to the launch configuration.
 	 * @param parent the parent {@link Composite}
-	 *
 	 */
 	private void createControl(Composite parent) {
 		fViewerControl = parent;
@@ -698,15 +698,13 @@ public class LaunchConfigurationTabGroupViewer {
 	}
 
 	protected void refreshTabs0(boolean refreshTabs) {
-		final boolean refresh = refreshTabs;
-		Runnable r = () -> {
+		BusyIndicator.showWhile(getShell().getDisplay(), () -> {
 			fViewform.setRedraw(false);
-			fRefreshTabs = !refresh;
-			displayInstanceTabs(refresh);
+			fRefreshTabs = !refreshTabs;
+			displayInstanceTabs(refreshTabs);
 			refreshStatus();
 			fViewform.setRedraw(true);
-		};
-		BusyIndicator.showWhile(getShell().getDisplay(), r);
+		});
 	}
 
 	/**
@@ -715,21 +713,22 @@ public class LaunchConfigurationTabGroupViewer {
 	 * @param input the new input, possibly <code>null</code>
 	 */
 	protected void inputChanged(Object input) {
-		final Object finput = input;
-		Runnable r = () -> {
+		BusyIndicator.showWhile(getShell().getDisplay(), () -> {
 			try {
 				fViewform.setRedraw(false);
-				if (finput instanceof ILaunchConfiguration configuration) {
+				if (input instanceof ILaunchConfiguration configuration) {
 					boolean refreshTabs = true;
 					if (fWorkingCopy != null
-							&& fWorkingCopy.getOriginal().equals(configuration.getWorkingCopy().getOriginal())) {
+							&& fWorkingCopy.getOriginal() != null //
+							&& Objects.equals(fWorkingCopy.getOriginal(),
+									configuration.getWorkingCopy().getOriginal())) {
 						refreshTabs = false;
 					}
 					fOriginal = configuration;
 					fWorkingCopy = configuration.getWorkingCopy();
 					// Need to refresh all the time as tabs might have changed
 					displayInstanceTabs(refreshTabs);
-				} else if (finput instanceof ILaunchConfigurationType configuration) {
+				} else if (input instanceof ILaunchConfigurationType configuration) {
 					fDescription = getDescription(configuration);
 					setNoInput();
 				} else {
@@ -742,8 +741,7 @@ public class LaunchConfigurationTabGroupViewer {
 				refreshStatus();
 				fViewform.setRedraw(true);
 			}
-		};
-		BusyIndicator.showWhile(getShell().getDisplay(), r);
+		});
 	}
 
 	/**
@@ -869,15 +867,16 @@ public class LaunchConfigurationTabGroupViewer {
 		// Update the name field
 		fNameWidget.setText(getWorkingCopy().getName());
 
-		fCurrentTabIndex = fTabFolder.getSelectionIndex();
+		fCurrentTabIndex = -1;
 
 		// Turn off initializing flag to update message
 		fInitializingTabs = false;
 
 		// Try to activate the same (type of) tab that was active before.
 		if (!setActiveTab(lastActiveTabKind)) {
-			// The tab with the wanted class wasn't found. Try to activate the first one
-			setActiveTab(0);
+			// The tab with the wanted class wasn't found. Try to activate the default tab
+			int defaultTabIndex = Math.max(fTabFolder.getSelectionIndex(), 0);
+			setActiveTab(defaultTabIndex);
 		}
 
 		if (!fViewform.isVisible()) {
@@ -1449,19 +1448,39 @@ public class LaunchConfigurationTabGroupViewer {
 		if (fDisposingTabs || fInitializingTabs) {
 			return;
 		}
+		int previousTabIndex = fCurrentTabIndex;
+		fCurrentTabIndex = fTabFolder.getSelectionIndex();
+
 		ILaunchConfigurationTab[] tabs = getTabs();
-		if (fCurrentTabIndex == fTabFolder.getSelectionIndex() || tabs == null || tabs.length == 0 || fCurrentTabIndex > (tabs.length - 1)) {
+		if (previousTabIndex == fCurrentTabIndex || tabs == null || tabs.length == 0
+				|| previousTabIndex > (tabs.length - 1)) {
 			return;
 		}
-		if (fCurrentTabIndex != -1) {
-			ILaunchConfigurationTab tab = tabs[fCurrentTabIndex];
-			ILaunchConfigurationWorkingCopy wc = getWorkingCopy();
-			if (wc != null) {
-				tab.deactivated(wc);
-				getActiveTab().activated(wc);
-			}
+
+		propagateTabDeactivation(previousTabIndex);
+
+		propagateTabActivation();
+	}
+
+	private void propagateTabDeactivation(int tabIndex) {
+		ILaunchConfigurationWorkingCopy wc = getWorkingCopy();
+
+		if (tabIndex < 0 || wc == null) {
+			return;
 		}
-		fCurrentTabIndex = fTabFolder.getSelectionIndex();
+
+		getTabs()[tabIndex].deactivated(wc);
+	}
+
+	private void propagateTabActivation() {
+		ILaunchConfigurationWorkingCopy wc = getWorkingCopy();
+		ILaunchConfigurationTab activeTab = getActiveTab();
+
+		if (wc == null || activeTab == null) {
+			return;
+		}
+
+		activeTab.activated(wc);
 	}
 
 	/**

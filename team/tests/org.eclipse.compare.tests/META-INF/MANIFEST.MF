@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: %pluginName
 Bundle-SymbolicName: org.eclipse.compare.tests;singleton:=true
-Bundle-Version: 3.8.200.qualifier
+Bundle-Version: 3.8.400.qualifier
 Require-Bundle: org.junit,
  org.eclipse.compare,
  org.eclipse.jface.text,
@@ -15,7 +15,9 @@ Require-Bundle: org.junit,
  org.eclipse.core.tests.harness,
  org.eclipse.core.filesystem,
  org.eclipse.team.ui
-Import-Package: org.junit.jupiter.api,
+Import-Package: org.assertj.core.api,
+ org.assertj.core.api.iterable,
+ org.junit.jupiter.api,
  org.junit.platform.suite.api
 Bundle-Activator: org.eclipse.compare.tests.CompareTestPlugin
 Bundle-ActivationPolicy: lazy

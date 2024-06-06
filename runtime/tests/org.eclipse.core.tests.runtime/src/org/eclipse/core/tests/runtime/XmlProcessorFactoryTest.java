@@ -10,10 +10,7 @@
  *******************************************************************************/
 package org.eclipse.core.tests.runtime;
 
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.CoreMatchers.not;
-import static org.hamcrest.CoreMatchers.startsWith;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -50,9 +47,8 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 import org.eclipse.core.internal.runtime.XmlProcessorFactory;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.InputSource;
@@ -63,8 +59,8 @@ import org.xml.sax.helpers.DefaultHandler;
 @SuppressWarnings("restriction")
 public class XmlProcessorFactoryTest {
 
-	@Rule
-	public TemporaryFolder tempFolder = new TemporaryFolder();
+	@TempDir
+	Path tempFolder;
 
 	@Test
 	public void testParseXmlWithExternalEntity() throws Exception {
@@ -302,9 +298,9 @@ public class XmlProcessorFactoryTest {
 	private InputStream createMalciousXml(int localPort) {
 		//
 		try {
-			Path tempSecret = tempFolder.newFile("test.txt").toPath();
+			Path tempSecret = Files.createFile(tempFolder.resolve("test.txt"));
 			Files.writeString(tempSecret, "secret");
-			Path tempDtd = tempFolder.newFile("test.dtd").toPath();
+			Path tempDtd = Files.createFile(tempFolder.resolve("test.dtd"));
 			URL secretURL = tempSecret.toUri().toURL();
 			String dtdContent = "<!ENTITY % var1 SYSTEM \"" + secretURL + "\">\n" //
 					+ "<!ENTITY var4 SYSTEM \"" + secretURL + "\">\n" //
@@ -352,8 +348,8 @@ public class XmlProcessorFactoryTest {
 							try (OutputStream outputStream = socket.getOutputStream()) {
 								outputStream.write("HTTP/1.1 200 OK\r\n".getBytes(StandardCharsets.UTF_8));
 							}
-							assertThat(firstLine, startsWith("GET"));
-							assertThat(firstLine, not(containsString("secret")));
+							assertThat(firstLine).startsWith("GET");
+							assertThat(firstLine).doesNotContain("secret");
 							fail("Server was contacted");
 						}
 					} catch (SocketException closed) {
@@ -383,11 +379,10 @@ public class XmlProcessorFactoryTest {
 
 		/** Example Server that will log and quit when contacted **/
 		public static void main(String[] args) throws Exception {
-			@SuppressWarnings("resource")
-			Server server = new Server();
-			System.out.println("Server startet on port: " + server.getLocalPort());
-			server.httpServerThread.join();
-			server.close();
+			try (Server server = new Server()) {
+				System.out.println("Server startet on port: " + server.getLocalPort());
+				server.httpServerThread.join();
+			}
 		}
 	}
 

@@ -338,9 +338,6 @@ public class SynchronizeView extends PageBookView implements ISynchronizeView, I
 		getSite().getPage().removePartListener(fLinkWithEditorListener);
 	}
 
-	/**
-	 *
-	 */
 	private void rememberCurrentParticipant() {
 		IDialogSettings section = getDialogSettings();
 		section.put(KEY_LAST_ACTIVE_PARTICIPANT_ID, activeParticipantRef.getId());
@@ -768,6 +765,8 @@ public class SynchronizeView extends PageBookView implements ISynchronizeView, I
 		case ISynchronizePageConfiguration.CONFLICTING_MODE:
 			syncMode = Utils.getString("action.directionFilterConflicts.tooltip", bundle); //$NON-NLS-1$
 			break;
+		default:
+			throw new IllegalArgumentException(Integer.toString(mode));
 		}
 
 		IViewSite viewSite = getViewSite();

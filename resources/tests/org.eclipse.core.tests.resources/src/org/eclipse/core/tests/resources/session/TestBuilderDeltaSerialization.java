@@ -14,35 +14,50 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.session;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestPluginConstants.PI_RESOURCES_TESTS;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.setAutoBuilding;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.setBuildOrder;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.updateProjectDescription;
+
 import java.io.ByteArrayInputStream;
-import java.util.Map;
-import junit.framework.Test;
-import org.eclipse.core.resources.ICommand;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
-import org.eclipse.core.resources.IProjectDescription;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.IncrementalProjectBuilder;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.tests.harness.session.SessionTestExtension;
 import org.eclipse.core.tests.internal.builders.SortBuilder;
 import org.eclipse.core.tests.internal.builders.TestBuilder;
-import org.eclipse.core.tests.resources.AutomatedResourceTests;
-import org.eclipse.core.tests.session.WorkspaceSessionTestSuite;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Tests that builder deltas are correctly serialized.
  */
-public class TestBuilderDeltaSerialization extends WorkspaceSerializationTest {
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+public class TestBuilderDeltaSerialization {
+
+	@RegisterExtension
+	static SessionTestExtension sessionTestExtension = SessionTestExtension.forPlugin(PI_RESOURCES_TESTS)
+			.withCustomization(SessionTestExtension.createCustomWorkspace()).create();
+
 	//various resource handles
 	private IProject project1, project2;
 	private IFolder sorted1, sorted2, unsorted1, unsorted2;
 	private IFile unsortedFile1, unsortedFile2;
 
-	@Override
-	protected void setUp() throws Exception {
-		super.setUp();
+	@BeforeEach
+	public void setUp() throws Exception {
 		IWorkspaceRoot root = getWorkspace().getRoot();
 		project1 = root.getProject("Project1");
 		unsorted1 = project1.getFolder(SortBuilder.UNSORTED_FOLDER);
@@ -58,9 +73,11 @@ public class TestBuilderDeltaSerialization extends WorkspaceSerializationTest {
 	/**
 	 * Create projects, setup a builder, and do an initial build.
 	 */
+	@Test
+	@Order(1)
 	public void test1() throws CoreException {
 		IResource[] resources = {project1, project2, unsorted1, unsorted2, sorted1, sorted2, unsortedFile1, unsortedFile2};
-		ensureExistsInWorkspace(resources, true);
+		createInWorkspace(resources);
 
 		// give unsorted files some initial content
 		unsortedFile1.setContents(new ByteArrayInputStream(new byte[] { 1, 4, 3 }), true, true, null);
@@ -70,49 +87,33 @@ public class TestBuilderDeltaSerialization extends WorkspaceSerializationTest {
 		setAutoBuilding(false);
 
 		// configure builder for project1
-		IProjectDescription description = project1.getDescription();
-		ICommand command = description.newCommand();
-		Map<String, String> args = command.getArguments();
-		args.put(TestBuilder.BUILD_ID, "Project1Build1");
-		args.put(TestBuilder.INTERESTING_PROJECT, project2.getName());
-		command.setBuilderName(SortBuilder.BUILDER_NAME);
-		command.setArguments(args);
-		description.setBuildSpec(new ICommand[] { command });
-		project1.setDescription(description, getMonitor());
+		updateProjectDescription(project1).addingCommand(SortBuilder.BUILDER_NAME).withTestBuilderId("Project1Build1")
+				.withAdditionalBuildArgument(TestBuilder.INTERESTING_PROJECT, project2.getName()).apply();
 
 		// configure builder for project2
-		description = project1.getDescription();
-		command = description.newCommand();
-		args = command.getArguments();
-		args.put(TestBuilder.BUILD_ID, "Project2Build1");
-		args.put(TestBuilder.INTERESTING_PROJECT, project1.getName());
-		command.setBuilderName(SortBuilder.BUILDER_NAME);
-		command.setArguments(args);
-		description.setBuildSpec(new ICommand[] { command });
-		project2.setDescription(description, getMonitor());
+		updateProjectDescription(project2).addingCommand(SortBuilder.BUILDER_NAME).withTestBuilderId("Project2Build1")
+				.withAdditionalBuildArgument(TestBuilder.INTERESTING_PROJECT, project1.getName()).apply();
 
 		// initial build -- created sortedFile1 and sortedFile2
-		workspace.build(IncrementalProjectBuilder.INCREMENTAL_BUILD, getMonitor());
+		getWorkspace().build(IncrementalProjectBuilder.INCREMENTAL_BUILD, createTestMonitor());
 
-		getWorkspace().save(true, getMonitor());
+		getWorkspace().save(true, createTestMonitor());
 	}
 
 	/**
 	 * Do another build immediately after restart.  Builder1 should be invoked because it cares
 	 * about changes made by Builder2 during the last build phase.
 	 */
+	@Test
+	@Order(2)
 	public void test2() throws CoreException {
-		getWorkspace().build(IncrementalProjectBuilder.INCREMENTAL_BUILD, getMonitor());
+		getWorkspace().build(IncrementalProjectBuilder.INCREMENTAL_BUILD, createTestMonitor());
 		//Only builder1 should have been built
 		SortBuilder[] builders = SortBuilder.allInstances();
-		assertEquals("1.0", 2, builders.length);
-		assertTrue("1.1", builders[0].wasBuilt());
-		assertTrue("1.2", builders[0].wasIncrementalBuild());
-		assertTrue("1.3", !builders[1].wasBuilt());
-	}
-
-	public static Test suite() {
-		return new WorkspaceSessionTestSuite(AutomatedResourceTests.PI_RESOURCES_TESTS, TestBuilderDeltaSerialization.class);
+		assertThat(builders).hasSize(2).satisfiesExactly(first -> {
+			assertThat(first.wasBuilt()).isTrue();
+			assertThat(first.wasIncrementalBuild()).isTrue();
+		}, second -> assertThat(second.wasAutoBuild()).isFalse());
 	}
 
 }

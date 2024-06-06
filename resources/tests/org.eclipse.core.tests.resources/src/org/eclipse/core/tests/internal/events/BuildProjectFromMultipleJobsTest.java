@@ -13,16 +13,38 @@
  *******************************************************************************/
 package org.eclipse.core.tests.internal.events;
 
-import java.util.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestPluginConstants.PI_RESOURCES_TESTS;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.setAutoBuilding;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.updateProjectDescription;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import org.eclipse.core.internal.events.BuildCommand;
 import org.eclipse.core.internal.resources.Project;
-import org.eclipse.core.resources.*;
-import org.eclipse.core.runtime.*;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IWorkspaceRoot;
+import org.eclipse.core.resources.IncrementalProjectBuilder;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.ILogListener;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.core.runtime.Platform;
+import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.core.tests.internal.builders.ConfigurationBuilder;
-import org.eclipse.core.tests.resources.AutomatedResourceTests;
-import org.eclipse.core.tests.resources.ResourceTest;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
 import org.eclipse.core.tests.resources.regression.SimpleBuilder;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 
 /**
  * Tests that triggering a project build from multiple jobs does not cause assertion failures,
@@ -30,47 +52,44 @@ import org.eclipse.core.tests.resources.regression.SimpleBuilder;
  *
  * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=517411">Eclipse bug 517411</a>
  */
-public class BuildProjectFromMultipleJobsTest extends ResourceTest {
+public class BuildProjectFromMultipleJobsTest {
+
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
 
 	private static final String TEST_PROJECT_NAME = "ProjectForBuildCommandTest";
 
 	private final ErrorLogListener logListener = new ErrorLogListener();
 
-	@Override
-	protected void setUp() throws Exception {
-		super.setUp();
+	@Before
+	public void setUp() throws Exception {
 		// auto-build makes reproducing the problem harder,
 		// since it may build before we trigger parallel builds from the test
 		setAutoBuilding(false);
 		Platform.addLogListener(logListener);
 	}
 
-	@Override
-	protected void tearDown() throws Exception {
+	@After
+	public void tearDown() throws Exception {
 		Job.getJobManager().cancel(BuildTestProject.class);
 
 		Platform.removeLogListener(logListener);
 		logListener.clear();
-
-		try {
-			IProject testProject = getTestProject();
-			if (testProject.exists()) {
-				testProject.delete(true, null);
-			}
-		} finally {
-		}
-
-		super.tearDown();
 	}
 
 	/**
-	 * Creates a project with no contents and a builder, and triggers a project build from multiple jobs.
-	 * Checks that no {@link AssertionFailedException} were logged during the builds.
+	 * Creates a project with no contents and a builder, and triggers a project
+	 * build from multiple jobs. Checks that no
+	 * {@link org.eclipse.core.runtime.AssertionFailedException} were logged during
+	 * the builds.
 	 *
-	 * Repeats this several times, to ensure that no exceptions are thrown due to the build from parallel threads.
+	 * Repeats this several times, to ensure that no exceptions are thrown due to
+	 * the build from parallel threads.
 	 *
-	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=517411">Eclipse bug 517411</a>
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=517411">Eclipse
+	 *      bug 517411</a>
 	 */
+	@Test
 	public void test10IterationsWithBuildsFrom8Jobs() throws Exception {
 		IProgressMonitor monitor = new NullProgressMonitor();
 
@@ -105,41 +124,37 @@ public class BuildProjectFromMultipleJobsTest extends ResourceTest {
 	/**
 	 * Tests that modifying {@link BuildCommand#getBuilders()} map does not allow to modify internal state of the command.
 	 */
-	@SuppressWarnings("rawtypes")
+	@Test
 	public void testBuildersAreNotModifiable() throws Exception {
 		Project project = (Project) createTestProject(ConfigurationBuilder.BUILDER_NAME, null);
 		project.build(IncrementalProjectBuilder.FULL_BUILD, null);
 
 		// Get a non-cloned version of the project desc build spec
 		BuildCommand buildCommand = (BuildCommand) project.internalGetDescription().getBuildSpec(false)[0];
-		Map buildersMap = (Map) buildCommand.getBuilders();
-		assertEquals(1, buildersMap.size());
+		assertThat(buildCommand.getBuilders()).isInstanceOf(Map.class);
+		if (buildCommand.getBuilders() instanceof Map<?, ?> buildersMap) {
+			assertThat(buildersMap.entrySet()).hasSize(1);
+			// Try to change the internal data
+			buildersMap.clear();
+			assertThat(buildersMap.entrySet()).isEmpty();
+		}
 
-		// Try to change the internal data
-		buildersMap.clear();
-		assertEquals(0, buildersMap.size());
-
-		// Should still be OK
-		buildersMap = (Map) buildCommand.getBuilders();
-		assertEquals("BuildCommand state was changed!", 1, buildersMap.size());
+		assertThat(buildCommand.getBuilders()).isInstanceOf(Map.class);
+		if (buildCommand.getBuilders() instanceof Map<?, ?> buildersMap) {
+			// Should still be OK
+			assertThat(buildersMap.entrySet()).as("check BuildCommand state did not changed").hasSize(1);
+		}
 	}
 
 	private IProject createTestProject(String builderId, IProgressMonitor monitor) throws CoreException {
 		IProject project = getTestProject();
 		assertFalse("Expected test project to not exist at beginning of test", project.exists());
 
-		ensureExistsInWorkspace(project, true);
+		createInWorkspace(project);
 		assertTrue("Expected test project to be open after creation", project.isOpen());
 
 		// add some builder to the project, so that we can run into the concurrency problem
-		IProjectDescription projectDescription = project.getDescription();
-		ICommand[] buildSpec = projectDescription.getBuildSpec();
-		ICommand command = projectDescription.newCommand();
-		command.setBuilderName(builderId);
-		Collection<ICommand> builders = new ArrayList<>(Arrays.asList(buildSpec));
-		builders.add(command);
-		projectDescription.setBuildSpec(builders.toArray(new ICommand[] {}));
-		project.setDescription(projectDescription, monitor);
+		updateProjectDescription(project).addingCommand(builderId).apply();
 
 		return project;
 	}
@@ -193,7 +208,7 @@ public class BuildProjectFromMultipleJobsTest extends ResourceTest {
 			} catch (CoreException e) {
 				return e.getStatus();
 			}
-			return new Status(IStatus.OK, AutomatedResourceTests.PI_RESOURCES_TESTS, getName() + " finished");
+			return new Status(IStatus.OK, PI_RESOURCES_TESTS, getName() + " finished");
 		}
 
 		@Override

@@ -13,15 +13,45 @@
  *******************************************************************************/
 package org.eclipse.core.tests.internal.localstore;
 
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInFileSystem;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.ensureOutOfSync;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.removeFromFileSystem;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
+
 import org.eclipse.core.internal.resources.Workspace;
-import org.eclipse.core.resources.*;
+import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IFolder;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IProjectDescription;
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 
-public class DeleteTest extends LocalStoreTest {
+public class DeleteTest {
 
-	public void testDeleteOpenProject() {
-		IProject project = projects[0];
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
+
+	private IProject project;
+
+	@Before
+	public void createTestProject() throws CoreException {
+		project = getWorkspace().getRoot().getProject("Project");
+		createInWorkspace(project);
+	}
+
+	@Test
+	public void testDeleteOpenProject() throws Exception {
 		IFolder folder = project.getFolder("folder");
 		IFile file = folder.getFile("file");
 
@@ -30,26 +60,22 @@ public class DeleteTest extends LocalStoreTest {
 		 * =========================================================== */
 
 		/* create some resources */
-		ensureExistsInWorkspace(new IResource[] {project, folder, file}, true);
+		createInWorkspace(new IResource[] {project, folder, file});
 		IPath folderPath = folder.getLocation();
 		IPath filePath = file.getLocation();
 		IPath projectLocation = project.getLocation();
 
 		/* delete */
-		try {
-			project.delete(false, true, getMonitor());
-		} catch (CoreException e) {
-			fail("1.0", e);
-		}
+		project.delete(false, true, createTestMonitor());
 
 		/* assert project does not exist anymore in the workspace*/
-		assertTrue("1.1", !project.exists());
-		assertTrue("1.2", !((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
-		assertNull("1.3", project.getLocation());
+		assertFalse(project.exists());
+		assertFalse(((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
+		assertNull(project.getLocation());
 
 		/* assert resources still exist */
-		assertTrue("1.4", folderPath.toFile().isDirectory());
-		assertTrue("1.5", filePath.toFile().isFile());
+		assertTrue(folderPath.toFile().isDirectory());
+		assertTrue(filePath.toFile().isFile());
 
 		/* remove trash */
 		Workspace.clear(projectLocation.toFile());
@@ -60,27 +86,23 @@ public class DeleteTest extends LocalStoreTest {
 		 * ========================================================== */
 
 		/* initialize common objects */
-		ensureExistsInWorkspace(new IResource[] {project, folder, file}, true);
+		createInWorkspace(new IResource[] {project, folder, file});
 		folderPath = folder.getLocation();
 		filePath = file.getLocation();
 		projectLocation = project.getLocation();
 
 		/* delete */
-		try {
-			project.delete(true, true, getMonitor());
-		} catch (CoreException e) {
-			fail("2.0", e);
-		}
+		project.delete(true, true, createTestMonitor());
 
 		/* assert project does not exist anymore in the workspace */
-		assertTrue("2.1", !project.exists());
-		assertTrue("2.2", !((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
-		assertNull("2.3", project.getLocation());
+		assertFalse(project.exists());
+		assertFalse(((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
+		assertNull(project.getLocation());
 
 		/* assert resources do not exist anymore */
-		assertTrue("2.4", !projectLocation.toFile().exists());
-		assertTrue("2.5", !folderPath.toFile().exists());
-		assertTrue("2.6", !filePath.toFile().exists());
+		assertFalse(projectLocation.toFile().exists());
+		assertFalse(folderPath.toFile().exists());
+		assertFalse(filePath.toFile().exists());
 
 		/* ===========================================================
 		 * project is OPEN, deleteContents=TRUE, force=TRUE
@@ -89,27 +111,24 @@ public class DeleteTest extends LocalStoreTest {
 		 * =========================================================== */
 
 		/* initialize common objects */
-		ensureExistsInWorkspace(project, true);
-		ensureExistsInWorkspace(new IResource[] {folder, file}, false);
+		createInWorkspace(project);
+		folder.create(true, false, createTestMonitor());
+		file.create(null, true, createTestMonitor());
 		folderPath = folder.getLocation();
 		filePath = file.getLocation();
 		projectLocation = project.getLocation();
 
 		/* delete */
-		try {
-			project.delete(true, true, getMonitor());
-		} catch (CoreException e) {
-			fail("3.0", e);
-		}
+		project.delete(true, true, createTestMonitor());
 
 		/* assert project does not exist anymore */
-		assertTrue("3.1", !project.exists());
-		assertTrue("3.2", !((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
-		assertNull("3.3", project.getLocation());
+		assertFalse(project.exists());
+		assertFalse(((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
+		assertNull(project.getLocation());
 
 		/* assert resources do not exist anymore */
-		assertTrue("3.4", !folderPath.toFile().isDirectory());
-		assertTrue("3.5", !filePath.toFile().isFile());
+		assertFalse(folderPath.toFile().isDirectory());
+		assertFalse(filePath.toFile().isFile());
 
 		/* ===========================================================
 		 * project is OPEN, deleteContents=TRUE, force=true
@@ -118,25 +137,21 @@ public class DeleteTest extends LocalStoreTest {
 		 * =========================================================== */
 
 		/* initialize common objects */
-		ensureExistsInWorkspace(new IResource[] {project, folder, file}, true);
+		createInWorkspace(new IResource[] {project, folder, file});
 		folderPath = folder.getLocation();
 		filePath = file.getLocation();
 
 		/* delete */
-		try {
-			project.delete(true, true, getMonitor());
-		} catch (CoreException e) {
-			fail("4.0", e);
-		}
+		project.delete(true, true, createTestMonitor());
 
 		/* assert project does not exist anymore */
-		assertTrue("6.1", !project.exists());
-		assertTrue("6.2", !((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
-		assertNull("6.3", project.getLocation());
+		assertFalse(project.exists());
+		assertFalse(((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
+		assertNull(project.getLocation());
 
 		/* assert resources do not still exist at default default area */
-		assertTrue("6.4", !folderPath.toFile().exists());
-		assertTrue("6.5", !filePath.toFile().exists());
+		assertFalse(folderPath.toFile().exists());
+		assertFalse(filePath.toFile().exists());
 
 		/* remove trash */
 		Workspace.clear(folderPath.toFile());
@@ -148,33 +163,28 @@ public class DeleteTest extends LocalStoreTest {
 		 * =========================================================== */
 
 		/* initialize common objects */
-		ensureExistsInWorkspace(project, true);
-		ensureExistsInFileSystem(new IResource[] {folder, file});
+		createInWorkspace(project);
+		createInFileSystem(folder);
+		createInFileSystem(file);
 		folderPath = folder.getLocation();
 		filePath = file.getLocation();
 		projectLocation = project.getLocation();
 
 		/* delete */
-		try {
-			project.delete(true, true, getMonitor());
-		} catch (CoreException e) {
-			fail("7.0", e);
-		}
+		project.delete(true, true, createTestMonitor());
 
 		/* assert project does not exist anymore */
-		assertTrue("7.1", !project.exists());
-		assertTrue("7.2", !((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
-		assertNull("7.3", project.getLocation());
+		assertFalse(project.exists());
+		assertFalse(((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
+		assertNull(project.getLocation());
 
 		/* assert resources do not exist anymore */
-		assertTrue("7.4", !folderPath.toFile().isDirectory());
-		assertTrue("7.5", !filePath.toFile().isFile());
-
+		assertFalse(folderPath.toFile().isDirectory());
+		assertFalse(filePath.toFile().isFile());
 	}
 
+	@Test
 	public void testDeleteClosedProject() throws Throwable {
-
-		IProject project = projects[0];
 		IFolder folder = project.getFolder("folder");
 		IFile file = folder.getFile("file");
 
@@ -184,32 +194,25 @@ public class DeleteTest extends LocalStoreTest {
 		 * =========================================================== */
 
 		/* initialize common objects */
-		ensureExistsInWorkspace(new IResource[] {project, folder}, true);
-		ensureExistsInWorkspace(file, false);
+		createInWorkspace(new IResource[] {project, folder});
+		getWorkspace().run(monitor -> file.create(null, true, monitor), createTestMonitor());
+		createInWorkspace(file);
 		IPath folderPath = folder.getLocation();
 		IPath filePath = file.getLocation();
 		IPath projectLocation = project.getLocation();
 
 		/* close and delete */
-		try {
-			project.close(getMonitor());
-		} catch (CoreException e) {
-			fail("1.0", e);
-		}
-		try {
-			project.delete(false, true, getMonitor());
-		} catch (CoreException e) {
-			fail("1.1", e);
-		}
+		project.close(createTestMonitor());
+		project.delete(false, true, createTestMonitor());
 
 		/* assert project does not exist anymore in the workspace */
-		assertTrue("1.2", !project.exists());
-		assertTrue("1.3", !((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
-		assertNull("1.4", project.getLocation());
+		assertFalse(project.exists());
+		assertFalse(((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
+		assertNull(project.getLocation());
 
 		/* assert resources still exist (if appropriate) */
-		assertTrue("1.5", folderPath.toFile().exists());
-		assertTrue("1.6", !filePath.toFile().exists());
+		assertTrue(folderPath.toFile().exists());
+		assertFalse(filePath.toFile().exists());
 
 		/* remove trash */
 		Workspace.clear(projectLocation.toFile());
@@ -220,30 +223,22 @@ public class DeleteTest extends LocalStoreTest {
 		 * =========================================================== */
 
 		/* initialize common objects */
-		ensureExistsInWorkspace(new IResource[] {project, folder, file}, true);
+		createInWorkspace(new IResource[] {project, folder, file});
 		folderPath = folder.getLocation();
 		filePath = file.getLocation();
 
 		/* close and delete */
-		try {
-			project.close(getMonitor());
-		} catch (CoreException e) {
-			fail("2.0", e);
-		}
-		try {
-			project.delete(true, true, getMonitor());
-		} catch (CoreException e) {
-			fail("2.1", e);
-		}
+		project.close(createTestMonitor());
+		project.delete(true, true, createTestMonitor());
 
 		/* assert project does not exist anymore */
-		assertTrue("2.2", !project.exists());
-		assertTrue("2.3", !((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
-		assertNull("2.4", project.getLocation());
+		assertFalse(project.exists());
+		assertFalse(((Workspace) getWorkspace()).getMetaArea().locationFor(project).toFile().exists());
+		assertNull(project.getLocation());
 
 		/* assert resources do not exist anymore */
-		assertTrue("2.5", !folderPath.toFile().isDirectory());
-		assertTrue("2.6", !filePath.toFile().isFile());
+		assertFalse(folderPath.toFile().isDirectory());
+		assertFalse(filePath.toFile().isFile());
 
 		/* ===========================================================
 		 * project is CLOSED, deleteContents=TRUE, force = FALSE
@@ -251,37 +246,30 @@ public class DeleteTest extends LocalStoreTest {
 		 * =========================================================== */
 
 		/* initialize common objects */
-		ensureExistsInWorkspace(new IResource[] {project, folder}, true);
-		ensureExistsInWorkspace(file, false);
+		createInWorkspace(new IResource[] {project, folder});
+		createInWorkspace(file);
 		folderPath = folder.getLocation();
 		filePath = file.getLocation();
 		projectLocation = project.getLocation();
 
 		/* close and delete */
-		try {
-			projects[0].close(getMonitor());
-		} catch (CoreException e) {
-			fail("3.0", e);
-		}
-		try {
-			projects[0].delete(true, false, getMonitor());
-		} catch (CoreException e) {
-			fail("3.1", e);
-		}
+		project.close(createTestMonitor());
+		project.delete(true, false, createTestMonitor());
 
 		/* assert project was deleted */
-		assertTrue("3.2", !project.exists());
+		assertFalse(project.exists());
 		IPath metaAreaLocation = ((Workspace) getWorkspace()).getMetaArea().locationFor(project);
-		assertTrue("3.3", !metaAreaLocation.toFile().exists());
-		assertTrue("3.4", !metaAreaLocation.append(".properties").toFile().exists());
-		assertTrue("3.5", !projectLocation.append(IProjectDescription.DESCRIPTION_FILE_NAME).toFile().exists());
-		assertNull("3.6", project.getLocation());
+		assertFalse(metaAreaLocation.toFile().exists());
+		assertFalse(metaAreaLocation.append(".properties").toFile().exists());
+		assertFalse(projectLocation.append(IProjectDescription.DESCRIPTION_FILE_NAME).toFile().exists());
+		assertNull(project.getLocation());
 
 		/* assert resources do not exist anymore */
-		assertTrue("3.7", !folderPath.toFile().exists());
-		assertTrue("3.8", !filePath.toFile().exists());
+		assertFalse(folderPath.toFile().exists());
+		assertFalse(filePath.toFile().exists());
 	}
 
+	@Test
 	public void testDeleteResource() throws Throwable {
 		/* test's hierarchy
 
@@ -314,96 +302,92 @@ public class DeleteTest extends LocalStoreTest {
 		/* =================== */
 
 		/* create some resources */
-		IFolder folder = projects[0].getFolder("folder");
-		ensureExistsInWorkspace(folder, true);
+		IFolder folder = project.getFolder("folder");
+		createInWorkspace(folder);
 		IFile fileSync = folder.getFile("fileSync");
-		ensureExistsInWorkspace(fileSync, true);
+		createInWorkspace(fileSync);
 		IFile fileUnsync = folder.getFile("fileUnsync");
-		ensureExistsInWorkspace(fileUnsync, true);
+		createInWorkspace(fileUnsync);
 		IFile fileCreated = folder.getFile("fileCreated");
-		ensureExistsInFileSystem(fileCreated); // create only in file system
+		createInFileSystem(fileCreated); // create only in file system
 		IFolder subfolderSync = folder.getFolder("subfolderSync");
-		ensureExistsInWorkspace(subfolderSync, true);
+		createInWorkspace(subfolderSync);
 		IFolder deletedfolderSync = subfolderSync.getFolder("deletedfolderSync");
-		ensureExistsInWorkspace(deletedfolderSync, true);
+		createInWorkspace(deletedfolderSync);
 		IFolder subfolderUnsync = folder.getFolder("subfolderUnsync");
-		ensureExistsInWorkspace(subfolderUnsync, true);
+		createInWorkspace(subfolderUnsync);
 		IFolder subsubfolderUnsync = subfolderUnsync.getFolder("subsubfolderUnsync");
-		ensureExistsInWorkspace(subsubfolderUnsync, true);
+		createInWorkspace(subsubfolderUnsync);
 		IFile subsubfileSync = subsubfolderUnsync.getFile("subsubfileSync");
-		ensureExistsInWorkspace(subsubfileSync, true);
+		createInWorkspace(subsubfileSync);
 		IFile subsubfileUnsync = subsubfolderUnsync.getFile("subsubfileUnsync");
-		ensureExistsInWorkspace(subsubfileUnsync, true);
+		createInWorkspace(subsubfileUnsync);
 
 		/* make some resources "unsync" with the workspace */
 		ensureOutOfSync(fileUnsync);
-		ensureDoesNotExistInFileSystem(deletedfolderSync);
+		removeFromFileSystem(deletedfolderSync);
 		ensureOutOfSync(subsubfileUnsync);
 
 		/* delete */
 		folder.delete(true, null);
 
 		/* assert resources do not exist anymore */
-		assertTrue("1.1", !folder.getLocation().toFile().exists());
+		assertFalse(folder.getLocation().toFile().exists());
 
 		/* =================== */
 		/* (2) force = FALSE   */
 		/* =================== */
 
 		/* create some resources */
-		folder = projects[0].getFolder("folder");
-		ensureExistsInWorkspace(folder, true);
+		IFolder recreatedFolder = project.getFolder("folder");
+		createInWorkspace(recreatedFolder);
 		//
-		fileSync = folder.getFile("fileSync");
-		ensureExistsInWorkspace(fileSync, true);
+		fileSync = recreatedFolder.getFile("fileSync");
+		createInWorkspace(fileSync);
 		//
-		fileUnsync = folder.getFile("fileUnsync");
-		ensureExistsInWorkspace(fileUnsync, true);
+		fileUnsync = recreatedFolder.getFile("fileUnsync");
+		createInWorkspace(fileUnsync);
 		//
-		fileCreated = folder.getFile("fileCreated");
-		ensureExistsInFileSystem(fileCreated); // create only in file system
+		fileCreated = recreatedFolder.getFile("fileCreated");
+		createInFileSystem(fileCreated); // create only in file system
 		//
-		subfolderSync = folder.getFolder("subfolderSync");
-		ensureExistsInWorkspace(subfolderSync, true);
+		subfolderSync = recreatedFolder.getFolder("subfolderSync");
+		createInWorkspace(subfolderSync);
 		//
 		deletedfolderSync = subfolderSync.getFolder("deletedfolderSync");
-		ensureExistsInWorkspace(deletedfolderSync, true);
+		createInWorkspace(deletedfolderSync);
 		//
-		subfolderUnsync = folder.getFolder("subfolderUnsync");
-		ensureExistsInWorkspace(subfolderUnsync, true);
+		subfolderUnsync = recreatedFolder.getFolder("subfolderUnsync");
+		createInWorkspace(subfolderUnsync);
 		//
 		subsubfolderUnsync = subfolderUnsync.getFolder("subsubfolderUnsync");
-		ensureExistsInWorkspace(subsubfolderUnsync, true);
+		createInWorkspace(subsubfolderUnsync);
 		//
 		subsubfileSync = subsubfolderUnsync.getFile("subsubfileSync");
-		ensureExistsInWorkspace(subsubfileSync, true);
+		createInWorkspace(subsubfileSync);
 		//
 		subsubfileUnsync = subsubfolderUnsync.getFile("subsubfileUnsync");
-		ensureExistsInWorkspace(subsubfileUnsync, true);
+		createInWorkspace(subsubfileUnsync);
 
 		/* make some resources "unsync" with the workspace */
 		ensureOutOfSync(fileUnsync);
-		ensureDoesNotExistInFileSystem(deletedfolderSync);
+		removeFromFileSystem(deletedfolderSync);
 		ensureOutOfSync(subsubfileUnsync);
 
 		/* delete */
-		try {
-			folder.delete(false, null);
-			fail("2.0");
-		} catch (CoreException e) {
-			// expected
-		}
+		assertThrows(CoreException.class, () -> recreatedFolder.delete(false, null));
 
 		/* assert resources do not exist anymore in the file system */
-		assertTrue("2.1", folder.getLocation().toFile().exists());
-		assertTrue("2.2", !fileSync.getLocation().toFile().exists());
-		assertTrue("2.3", fileUnsync.getLocation().toFile().exists());
-		assertTrue("2.4", !subfolderSync.getLocation().toFile().exists());
-		assertTrue("2.5", subfolderUnsync.getLocation().toFile().exists());
-		assertTrue("2.6", !deletedfolderSync.getLocation().toFile().exists());
-		assertTrue("2.7", subsubfolderUnsync.getLocation().toFile().exists());
-		assertTrue("2.8", subsubfileUnsync.getLocation().toFile().exists());
-		assertTrue("2.9", !subsubfileSync.getLocation().toFile().exists());
-		assertTrue("2.10", fileCreated.getLocation().toFile().exists());
+		assertTrue(recreatedFolder.getLocation().toFile().exists());
+		assertFalse(fileSync.getLocation().toFile().exists());
+		assertTrue(fileUnsync.getLocation().toFile().exists());
+		assertFalse(subfolderSync.getLocation().toFile().exists());
+		assertTrue(subfolderUnsync.getLocation().toFile().exists());
+		assertFalse(deletedfolderSync.getLocation().toFile().exists());
+		assertTrue(subsubfolderUnsync.getLocation().toFile().exists());
+		assertTrue(subsubfileUnsync.getLocation().toFile().exists());
+		assertFalse(subsubfileSync.getLocation().toFile().exists());
+		assertTrue(fileCreated.getLocation().toFile().exists());
 	}
+
 }

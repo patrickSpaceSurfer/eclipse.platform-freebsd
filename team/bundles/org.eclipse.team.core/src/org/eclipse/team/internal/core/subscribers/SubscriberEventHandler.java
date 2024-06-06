@@ -262,7 +262,6 @@ public abstract class SubscriberEventHandler extends BackgroundEventHandler {
 	 * subscribers that don't support the optimization, all resources in the subscriber are manually re-calculated.
 	 * @param resource the resources to check
 	 * @param depth the depth
-	 * @param monitor
 	 */
 	protected abstract void collectAll(
 		IResource resource,
@@ -272,7 +271,6 @@ public abstract class SubscriberEventHandler extends BackgroundEventHandler {
 	/**
 	 * Feed the given events to the set. The appropriate method on the set is called
 	 * for each event type.
-	 * @param events
 	 */
 	protected abstract void dispatchEvents(SubscriberEvent[] events, IProgressMonitor monitor);
 
@@ -316,6 +314,8 @@ public abstract class SubscriberEventHandler extends BackgroundEventHandler {
 							event.getResource(),
 							((ResourceEvent)event).getDepth(),
 							Policy.subMonitorFor(monitor, 64));
+					break;
+				default:
 					break;
 			}
 		} catch (OperationCanceledException e) {

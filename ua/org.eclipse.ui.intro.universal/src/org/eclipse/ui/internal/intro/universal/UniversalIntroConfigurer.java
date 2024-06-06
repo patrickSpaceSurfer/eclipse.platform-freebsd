@@ -30,8 +30,8 @@ import org.eclipse.core.runtime.Platform;
 import org.eclipse.help.internal.util.ProductPreferences;
 import org.eclipse.help.internal.util.SequenceResolver;
 import org.eclipse.jface.action.Action;
+import org.eclipse.ui.internal.intro.impl.model.AbstractIntroIdElement;
 import org.eclipse.ui.internal.intro.impl.model.ExtensionMap;
-import org.eclipse.ui.internal.intro.impl.model.IntroTheme;
 import org.eclipse.ui.internal.intro.universal.contentdetect.ContentDetector;
 import org.eclipse.ui.internal.intro.universal.util.ImageUtil;
 import org.eclipse.ui.internal.intro.universal.util.PreferenceArbiter;
@@ -219,7 +219,7 @@ public class UniversalIntroConfigurer extends IntroConfigurer implements
 	 * @return same path with a prefixed theme directory component
 	 */
 	private String getThemePrefixedPath(String path) {
-		String prefix = themeProperties != null ? themeProperties.get(IntroTheme.ATT_ID) : null;
+		String prefix = themeProperties != null ? themeProperties.get(AbstractIntroIdElement.ATT_ID) : null;
 		prefix = prefix == null ? "" : prefix.trim(); //$NON-NLS-1$
 		if (prefix.length() == 0) {
 			return null;
@@ -559,16 +559,15 @@ public class UniversalIntroConfigurer extends IntroConfigurer implements
 		if (primaryAnchors == null) {
 			primaryAnchors = Collections.emptyList();
 		}
-		List<List<IntroElement>> secondaryAnchorsList = new ArrayList<>();
+		List<List<IntroElement>> secondaryAnchors = new ArrayList<>();
 		for (int i=0;i<secondaryIntroData.length;++i) {
 			IntroData idata = secondaryIntroData[i];
 			List<IntroElement> anchors = getAnchors(idata, pageId, groupId);
 			if (anchors != null) {
-				secondaryAnchorsList.add(anchors);
+				secondaryAnchors.add(anchors);
 			}
 		}
 
-		List<IntroElement>[] secondaryAnchors = secondaryAnchorsList.toArray(new List[secondaryAnchorsList.size()]);
 		if (sequenceResolver == null) {
 			sequenceResolver = new SequenceResolver<>();
 		}

@@ -13,31 +13,36 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.regression;
 
-import org.eclipse.core.resources.*;
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IProjectDescription;
+import org.eclipse.core.resources.IResource;
+import org.eclipse.core.resources.IWorkspaceRunnable;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.tests.resources.ResourceTest;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Rule;
+import org.junit.Test;
 
 /**
  * Changing a project description requires the workspace root
  * scheduling rule.
  */
-public class Bug_127562 extends ResourceTest {
+public class Bug_127562 {
 
-	public void testBug() {
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
+
+	@Test
+	public void testBug() throws CoreException {
 		final IProject project = getWorkspace().getRoot().getProject("Bug127562");
-		ensureExistsInWorkspace(project, true);
-		IProjectDescription description = null;
-		try {
-			description = project.getDescription();
-			description.setComment("Foo");
-		} catch (CoreException e) {
-			fail("1.99", e);
-		}
-		final IProjectDescription finalDescription = description;
-		try {
-			getWorkspace().run((IWorkspaceRunnable) monitor -> project.setDescription(finalDescription, getMonitor()), getWorkspace().getRoot(), IResource.NONE, getMonitor());
-		} catch (CoreException e) {
-			fail("4.99", e);
-		}
+		createInWorkspace(project);
+		IProjectDescription description = project.getDescription();
+		description.setComment("Foo");
+		getWorkspace().run((IWorkspaceRunnable) monitor -> project.setDescription(description, createTestMonitor()),
+				getWorkspace().getRoot(), IResource.NONE, createTestMonitor());
 	}
+
 }

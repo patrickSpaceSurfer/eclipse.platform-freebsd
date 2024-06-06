@@ -13,11 +13,30 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.saveparticipant;
 
-import junit.framework.Test;
-import junit.framework.TestSuite;
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.assertExistsInFileSystem;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.assertExistsInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.buildResources;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createRandomContentsStream;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.setAutoBuilding;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.waitForBuild;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.eclipse.core.resources.*;
-import org.eclipse.core.runtime.*;
+import org.eclipse.core.resources.ICommand;
+import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IProjectDescription;
+import org.eclipse.core.resources.IResource;
+import org.eclipse.core.resources.IResourceDelta;
+import org.eclipse.core.resources.ISaveContext;
+import org.eclipse.core.resources.IncrementalProjectBuilder;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.tests.internal.builders.DeltaVerifierBuilder;
 import org.eclipse.core.tests.resources.regression.SimpleBuilder;
 import org.eclipse.core.tests.resources.saveparticipant1.SaveParticipant1Plugin;
@@ -35,55 +54,73 @@ import org.osgi.framework.BundleException;
  * @see SaveManager2Test
  * @see SaveManager3Test
  */
-public class SaveManager1Test extends SaveManagerTest {
+public class SaveManager1Test {
+
 	/**
-	 * Need a zero argument constructor to satisfy the test harness.
-	 * This constructor should not do any real work nor should it be
-	 * called by user code.
+	 * Create some resources and save the workspace.
 	 */
-	public SaveManager1Test() {
+	public void testCreateMyProject() throws CoreException {
+		IProject project = getWorkspace().getRoot().getProject(SaveManagerTest.PROJECT_1);
+		project.create(null);
+		project.open(null);
+		assertTrue(project.exists());
+		assertTrue(project.isOpen());
+
+		project.close(null);
+		assertTrue(project.exists());
+		assertFalse(project.isOpen());
+
+		// when closing and opening the project again, it should still exist
+		project = getWorkspace().getRoot().getProject(SaveManagerTest.PROJECT_1);
+		project.open(null);
+		assertTrue(project.exists());
+		assertTrue(project.isOpen());
+
+		// create some children
+		IResource[] resources = buildResources(project, SaveManagerTest.defineHierarchy(SaveManagerTest.PROJECT_1));
+		createInWorkspace(resources);
+		assertExistsInFileSystem(resources);
+		assertExistsInWorkspace(resources);
+
+		project.close(null);
+		project.open(null);
+		assertExistsInFileSystem(resources);
+		assertExistsInWorkspace(resources);
 	}
 
-	public SaveManager1Test(String name) {
-		super(name);
-	}
+	/**
+	 * Create another project and leave it closed for next session.
+	 */
+	public void testCreateProject2() throws CoreException {
+		IProject project = getWorkspace().getRoot().getProject(SaveManagerTest.PROJECT_2);
+		project.create(null);
+		project.open(null);
+		assertTrue(project.exists());
+		assertTrue(project.isOpen());
 
-	// copy and paste into the scrapbook
-	public static void doIt() throws Exception {
-		String[] testIds = {"saveparticipant.SaveManager1Test", "saveparticipant.SaveManager2Test", "saveparticipant.SaveManager3Test"};
-		for (int i = 0; i < testIds.length; i++) {
-			Process p = Runtime.getRuntime().exec(new String[] {"java", "org.eclipse.core.tests.harness.launcher.Main", "-test", testIds[i], "-data", "c:/temp/save_manager", (i < (testIds.length - 1) ? "-nocleanup" : "")});
-			p.waitFor();
-			java.io.InputStream input = p.getInputStream();
-			int c;
-			while ((c = input.read()) != -1)
-				System.out.print((char) c);
-			input.close();
-			input = p.getErrorStream();
-			while ((c = input.read()) != -1)
-				System.out.print((char) c);
-			input.close();
-		}
-		System.exit(-1);
-	}
+		// create some children
+		IResource[] resources = buildResources(project, SaveManagerTest.defineHierarchy(SaveManagerTest.PROJECT_2));
+		createInWorkspace(resources);
+		assertExistsInFileSystem(resources);
+		assertExistsInWorkspace(resources);
 
-	public static Test suite() {
-		// we do not add the whole class because the order is important
-		TestSuite suite = new TestSuite();
-		suite.addTest(new SaveManager1Test("saveWorkspace"));
-		suite.addTest(new SaveManager1Test("testCreateMyProject"));
-		suite.addTest(new SaveManager1Test("testCreateProject2"));
-		suite.addTest(new SaveManager1Test("testAddSaveParticipant"));
-		suite.addTest(new SaveManager1Test("testBuilder"));
-		suite.addTest(new SaveManager1Test("saveWorkspace"));
-		suite.addTest(new SaveManager1Test("testPostSave"));
-		return suite;
+		// add a builder to this project
+		IProjectDescription description = project.getDescription();
+		ICommand command = description.newCommand();
+		command.setBuilderName(SimpleBuilder.BUILDER_ID);
+		description.setBuildSpec(new ICommand[] { command });
+		project.setDescription(description, null);
+		project.build(IncrementalProjectBuilder.FULL_BUILD, null);
+
+		project.close(null);
+		assertTrue(project.exists());
+		assertFalse(project.isOpen());
 	}
 
 	public void testAddSaveParticipant() throws Exception {
 		// get plugin
-		Bundle bundle = Platform.getBundle(PI_SAVE_PARTICIPANT_1);
-		assertTrue("0.1", bundle != null);
+		Bundle bundle = Platform.getBundle(SaveManagerTest.PI_SAVE_PARTICIPANT_1);
+		assertNotNull(bundle);
 		bundle.start();
 		SaveParticipant1Plugin plugin1 = SaveParticipant1Plugin.getInstance();
 
@@ -91,68 +128,34 @@ public class SaveManager1Test extends SaveManagerTest {
 		plugin1.resetDeltaVerifier();
 		IStatus status;
 		status = plugin1.registerAsSaveParticipant();
-		assertTrue("Registering save participant failed with message: " + status.getMessage(), status.isOK());
+		assertTrue(status.isOK(), "Registering save participant failed with message: " + status.getMessage());
 		plugin1.setExpectedSaveKind(ISaveContext.FULL_SAVE);
 
 		// SaveParticipant2Plugin
-		bundle = Platform.getBundle(PI_SAVE_PARTICIPANT_2);
-		assertTrue("5.1", bundle != null);
+		bundle = Platform.getBundle(SaveManagerTest.PI_SAVE_PARTICIPANT_2);
+		assertNotNull(bundle);
 		bundle.start();
 		SaveParticipant2Plugin plugin2 = SaveParticipant2Plugin.getInstance();
 
 		//	prepare plugin to the save operation
 		plugin2.getDeltaVerifier().reset();
 		status = plugin2.registerAsSaveParticipant();
-		assertTrue("Registering save participant failed with message: " + status.getMessage(), status.isOK());
+		assertTrue(status.isOK(), "Registering save participant failed with message: " + status.getMessage());
 		plugin1.setExpectedSaveKind(ISaveContext.FULL_SAVE);
 
 		// SaveParticipant3Plugin
-		bundle = Platform.getBundle(PI_SAVE_PARTICIPANT_3);
-		assertTrue("7.1", bundle != null);
+		bundle = Platform.getBundle(SaveManagerTest.PI_SAVE_PARTICIPANT_3);
+		assertNotNull(bundle);
 		bundle.start();
 		SaveParticipant3Plugin plugin3 = SaveParticipant3Plugin.getInstance();
 
 		status = plugin3.registerAsSaveParticipant();
-		assertTrue("Registering save participant failed with message: " + status.getMessage(), status.isOK());
-	}
-
-	/**
-	 * Create another project and leave it closed for next session.
-	 */
-	public void testAnotherProject() throws CoreException {
-		IProject project = getWorkspace().getRoot().getProject(PROJECT_1);
-		project.create(null);
-		project.open(null);
-		assertTrue("0.1", project.exists());
-		assertTrue("0.2", project.isOpen());
-
-		project.close(null);
-		assertTrue("1.1", project.exists());
-		assertTrue("1.2", !project.isOpen());
-
-		// when closing and opening the project again, it should still exist
-		project = getWorkspace().getRoot().getProject(PROJECT_1);
-		project.open(null);
-		assertTrue("2.1", project.exists());
-		assertTrue("2.2", project.isOpen());
-
-		// create some children
-		IResource[] resources = buildResources(project, defineHierarchy(PROJECT_1));
-		ensureExistsInWorkspace(resources, true);
-		assertExistsInFileSystem("3.1", resources);
-		assertExistsInWorkspace("3.2", resources);
-
-		project.close(null);
-		project.open(null);
-		assertExistsInFileSystem("4.1", resources);
-		assertExistsInWorkspace("4.2", resources);
-
-		getWorkspace().save(true, null);
+		assertTrue(status.isOK(), "Registering save participant failed with message: " + status.getMessage());
 	}
 
 	public void testBuilder() throws CoreException {
-		IProject project = getWorkspace().getRoot().getProject(PROJECT_1);
-		assertTrue("0.0", project.isAccessible());
+		IProject project = getWorkspace().getRoot().getProject(SaveManagerTest.PROJECT_1);
+		assertTrue(project.isAccessible());
 
 		setAutoBuilding(true);
 		// Create and set a build spec for the project
@@ -161,7 +164,7 @@ public class SaveManager1Test extends SaveManagerTest {
 		command.setBuilderName(DeltaVerifierBuilder.BUILDER_NAME);
 		description.setBuildSpec(new ICommand[] {command});
 		project.setDescription(description, null);
-		project.build(IncrementalProjectBuilder.FULL_BUILD, getMonitor());
+		project.build(IncrementalProjectBuilder.FULL_BUILD, createTestMonitor());
 
 		// close and open the project and see if the builder gets a good delta
 		project.close(null);
@@ -171,84 +174,24 @@ public class SaveManager1Test extends SaveManagerTest {
 		DeltaVerifierBuilder verifier = DeltaVerifierBuilder.getInstance();
 		verifier.reset();
 		verifier.addExpectedChange(added, project, IResourceDelta.ADDED, 0);
-		added.create(getRandomContents(), true, null);
+		added.create(createRandomContentsStream(), true, null);
 		waitForBuild();
-		assertTrue("3.2", verifier.wasAutoBuild());
-		assertTrue("3.3", verifier.isDeltaValid());
+		assertTrue(verifier.wasAutoBuild());
+		assertTrue(verifier.isDeltaValid());
 		// remove the file because we don't want it to affect any other delta in the test
 		added.delete(true, false, null);
 	}
 
-	/**
-	 * Create some resources and save the workspace.
-	 */
-	public void testCreateMyProject() throws CoreException {
-		IProject project = getWorkspace().getRoot().getProject(PROJECT_1);
-		project.create(null);
-		project.open(null);
-		assertTrue("0.1", project.exists());
-		assertTrue("0.2", project.isOpen());
-
-		project.close(null);
-		assertTrue("1.1", project.exists());
-		assertTrue("1.2", !project.isOpen());
-
-		// when closing and opening the project again, it should still exist
-		project = getWorkspace().getRoot().getProject(PROJECT_1);
-		project.open(null);
-		assertTrue("2.1", project.exists());
-		assertTrue("2.2", project.isOpen());
-
-		// create some children
-		IResource[] resources = buildResources(project, defineHierarchy(PROJECT_1));
-		ensureExistsInWorkspace(resources, true);
-		assertExistsInFileSystem("3.1", resources);
-		assertExistsInWorkspace("3.2", resources);
-
-		project.close(null);
-		project.open(null);
-		assertExistsInFileSystem("4.1", resources);
-		assertExistsInWorkspace("4.2", resources);
-	}
-
-	/**
-	 * Create another project and leave it closed for next session.
-	 */
-	public void testCreateProject2() throws CoreException {
-		IProject project = getWorkspace().getRoot().getProject(PROJECT_2);
-		project.create(null);
-		project.open(null);
-		assertTrue("0.1", project.exists());
-		assertTrue("0.2", project.isOpen());
-
-		// create some children
-		IResource[] resources = buildResources(project, defineHierarchy(PROJECT_2));
-		ensureExistsInWorkspace(resources, true);
-		assertExistsInFileSystem("3.1", resources);
-		assertExistsInWorkspace("3.2", resources);
-
-		// add a builder to this project
-		IProjectDescription description = project.getDescription();
-		ICommand command = description.newCommand();
-		command.setBuilderName(SimpleBuilder.BUILDER_ID);
-		description.setBuildSpec(new ICommand[] {command});
-		project.setDescription(description, null);
-		project.build(IncrementalProjectBuilder.FULL_BUILD, null);
-
-		project.close(null);
-		assertTrue("5.1", project.exists());
-		assertTrue("5.2", !project.isOpen());
-	}
-
 	public void testPostSave() throws BundleException {
 		// get plugin
-		Bundle bundle = Platform.getBundle(PI_SAVE_PARTICIPANT_1);
-		assertTrue("0.1", bundle != null);
+		Bundle bundle = Platform.getBundle(SaveManagerTest.PI_SAVE_PARTICIPANT_1);
+		assertNotNull(bundle);
 		bundle.start();
 		SaveParticipant1Plugin plugin = SaveParticipant1Plugin.getInstance();
 
 		// look at the plugin save lifecycle
 		IStatus status = plugin.getSaveLifecycleLog();
-		assertTrue("Getting lifecycle log failed with message: " + status.getMessage(), status.isOK());
+		assertTrue(status.isOK(), "Getting lifecycle log failed with message: " + status.getMessage());
 	}
+
 }

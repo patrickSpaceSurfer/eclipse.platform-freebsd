@@ -17,9 +17,15 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.ILogListener;
+import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.debug.core.ILaunch;
@@ -28,9 +34,13 @@ import org.eclipse.debug.core.ILaunchConfigurationType;
 import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
 import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.debug.internal.core.LaunchManager;
+import org.eclipse.debug.internal.ui.DebugUIPlugin;
 import org.eclipse.debug.tests.launching.CancellingLaunchDelegate.CancellingLaunch;
 import org.eclipse.debug.tests.launching.ThrowingLaunchDelegate.ThrowingEnum;
 import org.eclipse.debug.tests.launching.ThrowingLaunchDelegate.ThrowingLaunch;
+import org.eclipse.swt.events.MouseEvent;
+import org.eclipse.swt.widgets.Event;
+import org.eclipse.swt.widgets.Shell;
 import org.junit.Test;
 
 /**
@@ -294,8 +304,7 @@ public class LaunchManagerTests extends AbstractLaunchTest {
 	 * Tests if a launch is properly removed from the launch manager when
 	 * #preLaunchCheck is cancelled
 	 *
-	 * @throws Exception see <a href=
-	 *             "https://bugs.eclipse.org/bugs/show_bug.cgi?id=437122">437122</a>
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=437122">437122</a>
 	 * @since 3.9.100
 	 */
 	@Test
@@ -319,8 +328,7 @@ public class LaunchManagerTests extends AbstractLaunchTest {
 	 * Tests if a launch is properly removed from the launch manager when
 	 * #finalLaunchCheck is cancelled
 	 *
-	 * @throws Exception see <a
-	 *             href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=437122">437122</a>
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=437122">437122</a>
 	 * @since 3.9.100
 	 */
 	@Test
@@ -344,8 +352,7 @@ public class LaunchManagerTests extends AbstractLaunchTest {
 	 * Tests if a launch is properly removed from the launch manager when
 	 * #buildFoLaunch is cancelled
 	 *
-	 * @throws Exception see <a
-	 *             href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=437122">437122</a>
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=437122">437122</a>
 	 * @since 3.9.100
 	 */
 	@Test
@@ -444,8 +451,7 @@ public class LaunchManagerTests extends AbstractLaunchTest {
 	 * Tests if a launch is properly removed from the launch manager when
 	 * <i>throwingEnum</i> method throws exception
 	 *
-	 * @throws Exception see <a href=
-	 *             "https://bugs.eclipse.org/bugs/show_bug.cgi?id=578302">578302</a>
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=578302">578302</a>
 	 */
 	private void testThrowingLaunchDelegateMethod(ThrowingEnum throwingEnum) throws Exception {
 		ILaunchConfiguration config = getThrowingConfiguration(throwingEnum);
@@ -468,8 +474,7 @@ public class LaunchManagerTests extends AbstractLaunchTest {
 	 * Tests if a launch is properly removed from the launch manager when
 	 * #preLaunchCheck throws exception
 	 *
-	 * @throws Exception see <a href=
-	 *             "https://bugs.eclipse.org/bugs/show_bug.cgi?id=578302">578302</a>
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=578302">578302</a>
 	 */
 	@Test
 	public void testThrowingPreLaunchCheck() throws Exception {
@@ -480,8 +485,7 @@ public class LaunchManagerTests extends AbstractLaunchTest {
 	 * Tests if a launch is properly removed from the launch manager when
 	 * #finalLaunchCheck throws exception
 	 *
-	 * @throws Exception see <a href=
-	 *             "https://bugs.eclipse.org/bugs/show_bug.cgi?id=578302">578302</a>
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=578302">578302</a>
 	 */
 	@Test
 	public void testThrowingFinalLaunchCheck() throws Exception {
@@ -492,8 +496,7 @@ public class LaunchManagerTests extends AbstractLaunchTest {
 	 * Tests if a launch is properly removed from the launch manager when
 	 * #buildFoLaunch throws exception
 	 *
-	 * @throws Exception see <a href=
-	 *             "https://bugs.eclipse.org/bugs/show_bug.cgi?id=578302">578302</a>
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=578302">578302</a>
 	 */
 	@Test
 	public void testThrowingBuildForLaunch() throws Exception {
@@ -504,11 +507,53 @@ public class LaunchManagerTests extends AbstractLaunchTest {
 	 * Tests if a launch is properly removed from the launch manager when
 	 * #buildFoLaunch throws exception
 	 *
-	 * @throws Exception see <a href=
-	 *             "https://bugs.eclipse.org/bugs/show_bug.cgi?id=578302">578302</a>
+	 * @see <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=578302">578302</a>
 	 */
 	@Test
 	public void testThrowingLaunch() throws Exception {
 		testThrowingLaunchDelegateMethod(ThrowingEnum.launch);
+	}
+
+	/**
+	 * Tooltip calculation was done in Job scheduled by
+	 * LaunchingResourceManager$fMouseListener. This Job was trying to get
+	 * selection from UI using API
+	 * SelectedResourceManager#getCurrentSelection(). For any reason if the UI
+	 * was locked for more than 10 secs
+	 * SelectedResourceManager#getCurrentSelection() API throws an exception as
+	 * it did not find opportunity to get UI thread to fetch selection.
+	 *
+	 * This test case checks if there were any errors were logged while
+	 * calculating tooltip.
+	 *
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void testToolTipCalculationLogsError() throws Exception {
+		LogListener logListener = new LogListener();
+		Platform.addLogListener(logListener);
+		Event event = new Event();
+		// Any widget is ok. We just need to check if
+		// SelectedResourceManager#getCurrentSelection() logs error or not.
+		Shell shell = DebugUIPlugin.getShell();
+		event.widget = shell;
+		DebugUIPlugin.getDefault().getLaunchingResourceManager().getfMouseListener().mouseEnter(new MouseEvent(event));
+		// This will lock this thread(UI) for 15 secs.
+		Thread.sleep(15000);
+		assertTrue("Tooltip calculation has logged exception", logListener.getLogs().isEmpty());
+	}
+
+	class LogListener implements ILogListener {
+		private Map<String, IStatus> logs = new HashMap<>();
+
+		@Override
+		public synchronized void logging(IStatus status, String plugin) {
+			logs.put(plugin, status);
+		}
+
+		Map<String, IStatus> getLogs() {
+			return logs;
+		}
 	}
 }

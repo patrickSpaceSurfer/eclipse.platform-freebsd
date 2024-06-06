@@ -13,17 +13,27 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.perf;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.platform.suite.api.SelectClasses;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * @since 3.1
  */
-@RunWith(Suite.class)
-@Suite.SuiteClasses({ BenchFileStore.class, BenchWorkspace.class, BenchMiscWorkspace.class,
-		BuilderPerformanceTest.class, MarkerPerformanceTest.class, LocalHistoryPerformanceTest.class,
-		WorkspacePerformanceTest.class, PropertyManagerPerformanceTest.class, FileSystemPerformanceTest.class })
+@Suite
+@SelectClasses({ //
+		BenchCopyFile.class, //
+		BenchElementTree.class, //
+		// BenchFileStore.class, // very long running
+		BenchMiscWorkspace.class, //
+		BenchWorkspace.class, //
+		BuilderPerformanceTest.class, //
+		ConcurrencyPerformanceTest.class, //
+		ContentDescriptionPerformanceTest.class, //
+		FileSystemPerformanceTest.class, //
+		LocalHistoryPerformanceTest.class, //
+		MarkerPerformanceTest.class, //
+		PropertyManagerPerformanceTest.class, //
+		WorkspacePerformanceTest.class, //
+})
 public class AllResourcePerfTests {
-	// these tests are flawed - see bug 57137
-	// ContentDescriptionPerformanceTest.class
 }

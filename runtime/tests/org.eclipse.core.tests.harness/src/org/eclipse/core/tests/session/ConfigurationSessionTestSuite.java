@@ -14,6 +14,7 @@
 package org.eclipse.core.tests.session;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -36,7 +37,6 @@ import org.eclipse.core.internal.runtime.InternalPlatform;
 import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.Platform;
-import org.eclipse.core.tests.harness.CoreTest;
 import org.eclipse.core.tests.harness.FileSystemHelper;
 import org.eclipse.core.tests.session.SetupManager.SetupException;
 import org.eclipse.osgi.service.datalocation.Location;
@@ -74,6 +74,7 @@ public class ConfigurationSessionTestSuite extends SessionTestSuite {
 		super(pluginId, name);
 	}
 
+	@SuppressWarnings("deprecation")
 	public void addMinimalBundleSet() {
 		// Just use any class from the bundles we want to add as minimal bundle set
 
@@ -86,13 +87,16 @@ public class ConfigurationSessionTestSuite extends SessionTestSuite {
 		addBundle(org.eclipse.core.runtime.content.IContentType.class); // org.eclipse.core.contenttype
 		addBundle(org.eclipse.equinox.app.IApplication.class); // org.eclipse.equinox.app
 
-		addBundle(org.eclipse.core.tests.harness.CoreTest.class); // org.eclipse.core.tests.harness
+		addBundle(org.eclipse.core.tests.harness.TestHarnessPlugin.class); // org.eclipse.core.tests.harness
 		addBundle(org.eclipse.test.performance.Performance.class); // org.eclipse.test.performance
 
 		addBundle(org.eclipse.jdt.internal.junit.runner.ITestLoader.class); // org.eclipse.jdt.junit.runtime
 		addBundle(org.eclipse.jdt.internal.junit4.runner.JUnit4TestLoader.class); // org.eclipse.jdt.junit4.runtime
+		addBundle(org.eclipse.jdt.internal.junit5.runner.JUnit5TestLoader.class); // org.eclipse.jdt.junit5.runtime
 		addBundle(org.eclipse.pde.internal.junit.runtime.CoreTestApplication.class); // org.eclipse.pde.junit.runtime
 
+		addBundle(net.bytebuddy.ByteBuddy.class); // net.bytebuddy for org.assertj.core.api
+		addBundle(org.assertj.core.api.Assertions.class); // org.assertj.core.api
 		addBundle(org.hamcrest.CoreMatchers.class); // org.hamcrest.core
 
 		// The org.junit bundle requires an org.hamcrest.core bundle, but as of version
@@ -118,8 +122,17 @@ public class ConfigurationSessionTestSuite extends SessionTestSuite {
 
 		addBundle(org.junit.Test.class); // org.junit
 		addBundle(org.junit.jupiter.api.Test.class); // junit-jupiter-api
+		addBundle(org.junit.jupiter.engine.JupiterTestEngine.class); // junit-jupiter-engine
+		addBundle(org.junit.jupiter.migrationsupport.EnableJUnit4MigrationSupport.class); // junit-jupiter-migrationsupport
+		addBundle(org.junit.jupiter.params.ParameterizedTest.class); // junit-jupiter-params
+		addBundle(org.junit.vintage.engine.VintageTestEngine.class); // junit-vintage-engine
 		addBundle(org.junit.platform.commons.JUnitException.class); // junit-platform-commons
+		addBundle(org.junit.platform.engine.TestEngine.class); // junit-platform-engine
+		addBundle(org.junit.platform.launcher.Launcher.class); // junit-platform-launcher
+		addBundle(org.junit.platform.runner.JUnitPlatform.class); // junit-platform-runner
 		addBundle(org.junit.platform.suite.api.Suite.class); // junit-platform-suite-api
+		addBundle(org.junit.platform.suite.commons.SuiteLauncherDiscoveryRequestBuilder.class); // junit-platform-suite-commons
+		addBundle(org.junit.platform.suite.engine.SuiteTestEngine.class); // junit-platform-suite-engine
 		addBundle(org.apiguardian.api.API.class); // org.apiguardian.api
 		addBundle(org.opentest4j.AssertionFailedError.class); // org.opentest4j
 	}
@@ -214,8 +227,7 @@ public class ConfigurationSessionTestSuite extends SessionTestSuite {
 		try {
 			externalForm = location.get().toURI().toURL().toExternalForm();
 		} catch (Exception e) {
-			CoreTest.fail("Failed to convert file to URL string:" + location.get(), e);
-			return null; // Cannot happen
+			throw new IllegalArgumentException("Failed to convert file to URL string:" + location.get(), e);
 		}
 		// workaround for bug 88070
 		return "reference:" + externalForm + (suffix != null ? suffix : "");
@@ -231,7 +243,6 @@ public class ConfigurationSessionTestSuite extends SessionTestSuite {
 
 	/**
 	 * Ensures setup uses this suite's instance location.
-	 * @throws SetupException
 	 */
 	@Override
 	protected Setup newSetup() throws SetupException {
@@ -255,10 +266,10 @@ public class ConfigurationSessionTestSuite extends SessionTestSuite {
 				try {
 					createConfigINI();
 				} catch (IOException e) {
-					CoreTest.fail("0.1", e);
+					fail(e);
 				}
 			}
-			if (!shouldSort || isSharedSession()) {
+			if (!shouldSort) {
 				// for shared sessions, we don't control the execution of test cases
 				super.run(result);
 				return;
@@ -277,7 +288,7 @@ public class ConfigurationSessionTestSuite extends SessionTestSuite {
 					try {
 						createConfigINI();
 					} catch (IOException e) {
-						CoreTest.fail("0.1", e);
+						fail(e);
 					}
 				// end of KLUDGE
 				}

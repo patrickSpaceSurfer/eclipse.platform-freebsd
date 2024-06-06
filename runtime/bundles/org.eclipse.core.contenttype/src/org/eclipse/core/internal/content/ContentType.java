@@ -395,7 +395,6 @@ public final class ContentType implements IContentType, IContentTypeInfo {
 	 *            the file spec string
 	 * @param typeMask
 	 *            FILE_NAME_SPEC or FILE_EXTENSION_SPEC or FILE_REGEXP_SPEC
-	 * @param strict
 	 * @return true if this file spec has already been added, false otherwise
 	 */
 	boolean hasFileSpec(String text, int typeMask, boolean strict) {
@@ -545,24 +544,25 @@ public final class ContentType implements IContentType, IContentTypeInfo {
 		return validation == STATUS_VALID;
 	}
 
-	void processPreferences(Preferences contentTypeNode) {
+	void processPreferences(Preferences contentTypeNode, boolean userDefined) {
+		int definedByFlag = userDefined ? SPEC_USER_DEFINED : SPEC_PRE_DEFINED;
 		// user set default charset
 		this.userCharset = contentTypeNode.get(PREF_DEFAULT_CHARSET, null);
 		// user set file names
 		String userSetFileNames = contentTypeNode.get(PREF_FILE_NAMES, null);
 		String[] fileNames = Util.parseItems(userSetFileNames);
 		for (String fileName : fileNames)
-			internalAddFileSpec(fileName, FILE_NAME_SPEC | SPEC_USER_DEFINED);
+			internalAddFileSpec(fileName, FILE_NAME_SPEC | definedByFlag);
 		// user set file extensions
 		String userSetFileExtensions = contentTypeNode.get(PREF_FILE_EXTENSIONS, null);
 		String[] fileExtensions = Util.parseItems(userSetFileExtensions);
 		for (String fileExtension : fileExtensions)
-			internalAddFileSpec(fileExtension, FILE_EXTENSION_SPEC | SPEC_USER_DEFINED);
+			internalAddFileSpec(fileExtension, FILE_EXTENSION_SPEC | definedByFlag);
 		// user set file name regexp
 		String userSetFileRegexp = contentTypeNode.get(PREF_FILE_PATTERNS, null);
 		String[] fileRegexps = Util.parseItems(userSetFileRegexp);
 		for (String fileRegexp : fileRegexps) {
-			internalAddFileSpec(fileRegexp, FILE_PATTERN_SPEC | SPEC_USER_DEFINED);
+			internalAddFileSpec(fileRegexp, FILE_PATTERN_SPEC | definedByFlag);
 		}
 	}
 

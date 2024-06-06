@@ -116,7 +116,6 @@ public final class Platform {
 	 * the existence of runnable applications. A plug-in may define any
 	 * number of applications; however, the platform is only capable
 	 * of running one application at a time.
-	 *
 	 */
 	public static final String PT_APPLICATIONS = "applications"; //$NON-NLS-1$
 
@@ -612,7 +611,7 @@ public final class Platform {
 	 * for data access and modifications.
 	 * This API will be deleted in a future release. See bug 370248 for details.
 	 */
-	@Deprecated
+	@Deprecated(forRemoval = true, since = "2024-03")
 	public static void addProtectionSpace(URL resourceUrl, String realm) throws CoreException {
 		AuthorizationHandler.addProtectionSpace(resourceUrl, realm);
 	}
@@ -776,7 +775,6 @@ public final class Platform {
 	/**
 	 * As the org.eclipse.core.runtime.compatibility plug-in has been removed in
 	 * Eclipse 4.6 this method is not supported anymore.
-	 *
 	 */
 	@Deprecated
 	public static Plugin getPlugin(String id) {
@@ -1170,20 +1168,24 @@ public final class Platform {
 	/**
 	 * Returns the platform administrator for this running Eclipse.
 	 * <p>
-	 * Note: This is an internal method and <em>must not</em>
-	 * be used by clients which are not part of the Eclipse Platform.
-	 * This method allows access to classes which are not Eclipse
-	 * Platform API but are part of the OSGi runtime that the Eclipse
-	 * Platform is built on. Even as the Eclipse Platform evolves
-	 * in compatible ways from release to release, the details of
-	 * the OSGi implementation might not.
-	 * </p><p>
-	 * Clients can also acquire the {@link PlatformAdmin} service
-	 * to retrieve this object.
+	 * Note: This is an internal method and <em>must not</em> be used by clients
+	 * which are not part of the Eclipse Platform. This method allows access to
+	 * classes which are not Eclipse Platform API but are part of the OSGi runtime
+	 * that the Eclipse Platform is built on. Even as the Eclipse Platform evolves
+	 * in compatible ways from release to release, the details of the OSGi
+	 * implementation might not.
 	 * </p>
+	 * <p>
+	 * Clients can also acquire the {@link PlatformAdmin} service to retrieve this
+	 * object.
+	 * </p>
+	 *
 	 * @return the platform admin for this instance of Eclipse
+	 * @deprecated only consumer is PDE and this should never be used by other
+	 *             clients, see javadoc for details.
 	 * @since 3.0
 	 */
+	@Deprecated(forRemoval = true)
 	public static PlatformAdmin getPlatformAdmin() {
 		return InternalPlatform.getDefault().getPlatformAdmin();
 	}

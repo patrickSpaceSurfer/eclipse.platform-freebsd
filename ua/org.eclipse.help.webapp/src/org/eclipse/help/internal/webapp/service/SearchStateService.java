@@ -14,6 +14,7 @@
 package org.eclipse.help.internal.webapp.service;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -62,7 +63,6 @@ public class SearchStateService extends HttpServlet {
 	 * Servlet to handle a POST request.
 	 *
 	 * Handle the search requests,
-	 *
 	 */
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
@@ -73,7 +73,6 @@ public class SearchStateService extends HttpServlet {
 
 	/**
 	 * Processes all requests to the servlet.
-	 *
 	 */
 	private void process(HttpServletRequest req, HttpServletResponse resp)
 			throws ServletException, IOException {
@@ -97,14 +96,16 @@ public class SearchStateService extends HttpServlet {
 
 		String returnType = req.getParameter(Utils.RETURN_TYPE);
 		boolean isXML = Utils.XML.equalsIgnoreCase(returnType);
+		@SuppressWarnings("resource")
+		PrintWriter writer = resp.getWriter();
 		if (isXML) {
 			resp.setContentType("application/xml"); //$NON-NLS-1$
-			resp.getWriter().write(toXML(indexCompletion));
+			writer.write(toXML(indexCompletion));
 		} else {
 			resp.setContentType("text/plain"); //$NON-NLS-1$
-			resp.getWriter().write(toString(indexCompletion));
+			writer.write(toString(indexCompletion));
 		}
-		resp.getWriter().flush();
+		writer.flush();
 	}
 
 	public static String toXML(int percent) {

@@ -13,34 +13,61 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.refresh;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.eclipse.core.internal.refresh.RefreshJob.BASE_REFRESH_DEPTH;
 import static org.eclipse.core.internal.refresh.RefreshJob.DEPTH_INCREASE_STEP;
 import static org.eclipse.core.internal.refresh.RefreshJob.FAST_REFRESH_THRESHOLD;
 import static org.eclipse.core.internal.refresh.RefreshJob.MAX_RECURSION;
 import static org.eclipse.core.internal.refresh.RefreshJob.SLOW_REFRESH_THRESHOLD;
 import static org.eclipse.core.internal.refresh.RefreshJob.UPDATE_DELAY;
-import static org.junit.Assert.assertArrayEquals;
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.core.internal.refresh.RefreshJob;
 import org.eclipse.core.internal.refresh.RefreshManager;
 import org.eclipse.core.internal.resources.Workspace;
-import org.eclipse.core.resources.*;
-import org.eclipse.core.runtime.*;
+import org.eclipse.core.resources.IFolder;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IResource;
+import org.eclipse.core.resources.IWorkspaceRoot;
+import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IPath;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.core.runtime.preferences.IEclipsePreferences;
 import org.eclipse.core.runtime.preferences.InstanceScope;
-import org.eclipse.core.tests.resources.ResourceTest;
 import org.eclipse.core.tests.resources.TestUtil;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
 
 /**
  * Tests for RefreshJob
  */
-public class RefreshJobTest extends ResourceTest {
+public class RefreshJobTest {
+
+	@Rule
+	public TestName testName = new TestName();
+
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
 
 	private static final String REFRESH_JOB_FIELD_NAME = "refreshJob";
 	private boolean defaultRefresh;
@@ -55,9 +82,8 @@ public class RefreshJobTest extends ResourceTest {
 
 	private RefreshJob originalJob;
 
-	@Override
-	protected void setUp() throws Exception {
-		super.setUp();
+	@Before
+	public void setUp() {
 		IEclipsePreferences prefs = getPrefs();
 		defaultRefresh = prefs.getBoolean(ResourcesPlugin.PREF_AUTO_REFRESH, false);
 		if (defaultRefresh) {
@@ -69,13 +95,12 @@ public class RefreshJobTest extends ResourceTest {
 		updateDelay = 0;
 	}
 
-	@Override
-	protected void tearDown() throws Exception {
+	@After
+	public void tearDown() throws Exception {
 		restoreRefreshJob();
 		if (shouldResetDefault) {
 			getPrefs().putBoolean(ResourcesPlugin.PREF_AUTO_REFRESH, defaultRefresh);
 		}
-		super.tearDown();
 	}
 
 	private IEclipsePreferences getPrefs() {
@@ -85,6 +110,7 @@ public class RefreshJobTest extends ResourceTest {
 	/**
 	 * Test to ensure that there is no endless loop on refresh
 	 */
+	@Test
 	public void testBug578487_refreshLoop() throws Exception {
 		String name = "testBug578487_refreshLoop";
 		int minDepth = 0;
@@ -106,6 +132,7 @@ public class RefreshJobTest extends ResourceTest {
 	 * Just a trivial test that few directories can be refreshed with default
 	 * settings and default max depth of 2
 	 */
+	@Test
 	public void testBasicRefresh() throws Exception {
 		String name = "testBasicRefresh";
 		int minDepth = 0;
@@ -122,6 +149,7 @@ public class RefreshJobTest extends ResourceTest {
 	 * Test that few directories can be refreshed with max depth of 16 (simulating a
 	 * very fast file system)
 	 */
+	@Test
 	public void testFastRefresh() throws Exception {
 		String name = "testFastRefresh";
 		int minDepth = 0;
@@ -141,10 +169,10 @@ public class RefreshJobTest extends ResourceTest {
 
 	/**
 	 * Test that lot of directories can be refreshed with max depth of 8
-	 *
-	 * XXX: test is disabled because it needs 400 seconds on fast SSD on Linux
 	 */
-	public void XtestSmallRecursionRefresh() throws Exception {
+	@Test
+	@Ignore("test is disabled because it needs 400 seconds on fast SSD on Linux")
+	public void testSmallRecursionRefresh() throws Exception {
 		String name = "testSmallRecursionRefresh";
 		maxRecursionDeep = 8;
 		int minDepth = 0;
@@ -164,10 +192,10 @@ public class RefreshJobTest extends ResourceTest {
 
 	/**
 	 * Test that lot of directories can be refreshed with max possible depth
-	 *
-	 * XXX: test is disabled because it needs 250 seconds on fast SSD on Linux
 	 */
-	public void XtestBigRecursionDeepRefresh() throws Exception {
+	@Test
+	@Ignore("test is disabled because it needs 250 seconds on fast SSD on Linux")
+	public void testBigRecursionDeepRefresh() throws Exception {
 		String name = "testBigRecursionDeepRefresh";
 		maxRecursionDeep = MAX_RECURSION;// 2 << 29; // 1073741824
 		int minDepth = 0;
@@ -189,6 +217,7 @@ public class RefreshJobTest extends ResourceTest {
 	 * Test that few directories can be refreshed with max depth of 1 (simulating a
 	 * very slow file system)
 	 */
+	@Test
 	public void testSlowRefresh() throws Exception {
 		String name = "testSlowRefresh";
 		int minDepth = 0;
@@ -210,9 +239,10 @@ public class RefreshJobTest extends ResourceTest {
 	 * RefreshJob should use right rule to refresh resources, so it should wait with
 	 * refresh if
 	 */
+	@Test
 	public void testProjectRule() throws Exception {
 		TestRefreshJob refreshJob = createAndReplaceDefaultJob();
-		IProject project = createProject(getName());
+		IProject project = createProject(testName.getMethodName());
 		try {
 			IFolder parent = project.getFolder("parent");
 			parent.create(true, true, null);
@@ -233,7 +263,7 @@ public class RefreshJobTest extends ResourceTest {
 				assertEquals("Should not visit anything yet", Collections.EMPTY_SET, refreshJob.visitedResources);
 				Job.getJobManager().endRule(project);
 				releaseRule = false;
-				TestUtil.waitForJobs(getName(), 100, 1000);
+				TestUtil.waitForJobs(testName.getMethodName(), 100, 1000);
 				assertTrue("Refresh was not started", refreshJob.refreshStarted);
 				assertTrue("Refresh was not finished", refreshJob.refreshDone);
 				assertEquals("Missing refresh", expected, refreshJob.visitedResources);
@@ -243,14 +273,16 @@ public class RefreshJobTest extends ResourceTest {
 				}
 			}
 		} finally {
-			deleteProject(getName());
+			deleteProject(testName.getMethodName());
 		}
 	}
 
 	// Disabled for now, is unstable
-	public void XtestUnrelatedRule() throws Exception {
+	@Test
+	@Ignore("disabled for now, is unstable")
+	public void testUnrelatedRule() throws Exception {
 		TestRefreshJob refreshJob = createAndReplaceDefaultJob();
-		IProject project = createProject(getName());
+		IProject project = createProject(testName.getMethodName());
 		try {
 			IFolder parent = project.getFolder("parent");
 			parent.create(true, true, null);
@@ -264,7 +296,7 @@ public class RefreshJobTest extends ResourceTest {
 			try {
 				Job.getJobManager().beginRule(rule, null);
 				refreshJob.refresh(child);
-				TestUtil.waitForJobs(getName(), 10, 60_000, ResourcesPlugin.FAMILY_AUTO_REFRESH);
+				TestUtil.waitForJobs(testName.getMethodName(), 10, 60_000, ResourcesPlugin.FAMILY_AUTO_REFRESH);
 				assertTrue("Refresh was not started", refreshJob.refreshStarted);
 				assertTrue("Refresh was not finished", refreshJob.refreshDone);
 				Job.getJobManager().endRule(rule);
@@ -276,7 +308,7 @@ public class RefreshJobTest extends ResourceTest {
 				}
 			}
 		} finally {
-			deleteProject(getName());
+			deleteProject(testName.getMethodName());
 		}
 	}
 
@@ -314,22 +346,19 @@ public class RefreshJobTest extends ResourceTest {
 		project.refreshLocal(IResource.DEPTH_INFINITE, null);
 		Set<IResource> missing = new LinkedHashSet<>();
 		Set<IResource> visited = new LinkedHashSet<>();
-		project.accept(new IResourceVisitor() {
-			@Override
-			public boolean visit(IResource resource) throws CoreException {
-				if (resource.getType() == IResource.FILE) {
-					return true;
-				}
-				visited.add(resource);
-				if (!resources.contains(resource)) {
-					missing.add(resource);
-				}
+		project.accept(resource -> {
+			if (resource.getType() == IResource.FILE) {
 				return true;
 			}
+			visited.add(resource);
+			if (!resources.contains(resource)) {
+				missing.add(resource);
+			}
+			return true;
 		});
-		assertArrayEquals("Resources not refreshed", new IResource[0], missing.toArray());
-		assertFalse("Projects should be not empty", visited.isEmpty());
-		assertFalse("No resources refreshed", resources.isEmpty());
+		assertThat(missing).as("resources not refreshed").isEmpty();
+		assertThat(visited).as("visited projects").isNotEmpty();
+		assertThat(resources).as("refreshed resources").isNotEmpty();
 	}
 
 	private TestRefreshJob createAndReplaceDefaultJob() throws Exception {

@@ -75,7 +75,6 @@ import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.content.IContentDescription;
 import org.eclipse.core.runtime.preferences.IEclipsePreferences;
 import org.eclipse.core.runtime.preferences.IEclipsePreferences.IPreferenceChangeListener;
-import org.eclipse.core.runtime.preferences.IEclipsePreferences.PreferenceChangeEvent;
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.core.variables.IStringVariableManager;
 import org.eclipse.core.variables.VariablesPlugin;
@@ -134,29 +133,26 @@ public class AntModel implements IAntModel {
 
 	private final IPreferenceChangeListener fCoreListener = event -> {
 		if (IAntCoreConstants.PREFERENCE_CLASSPATH_CHANGED.equals(event.getKey())) {
-			if (Boolean.parseBoolean((String) event.getNewValue()) == true) {
+			if (Boolean.parseBoolean((String) event.getNewValue())) {
 				reconcileForPropertyChange(true);
 			}
 		}
 	};
-	private final IPreferenceChangeListener fUIListener = new IPreferenceChangeListener() {
-		@Override
-		public void preferenceChange(PreferenceChangeEvent event) {
-			String property = event.getKey();
-			if (property.equals(AntEditorPreferenceConstants.PROBLEM)) {
-				IEclipsePreferences node = InstanceScope.INSTANCE.getNode(AntUIPlugin.PI_ANTUI);
-				if (node != null) {
-					node.removePreferenceChangeListener(fUIListener);
-					reconcileForPropertyChange(false);
-					node.addPreferenceChangeListener(fUIListener);
-				}
-			} else if (property.equals(AntEditorPreferenceConstants.CODEASSIST_USER_DEFINED_TASKS)) {
+	private final IPreferenceChangeListener fUIListener = event -> {
+		String property = event.getKey();
+		if (property.equals(AntEditorPreferenceConstants.PROBLEM)) {
+			IEclipsePreferences node = InstanceScope.INSTANCE.getNode(AntUIPlugin.PI_ANTUI);
+			if (node != null) {
+				node.removePreferenceChangeListener(this.fUIListener);
 				reconcileForPropertyChange(false);
-			} else if (property.equals(AntEditorPreferenceConstants.BUILDFILE_NAMES_TO_IGNORE)
-					|| property.equals(AntEditorPreferenceConstants.BUILDFILE_IGNORE_ALL)) {
-				fReportingProblemsCurrent = false;
-				reconcileForPropertyChange(false);
+				node.addPreferenceChangeListener(this.fUIListener);
 			}
+		} else if (property.equals(AntEditorPreferenceConstants.CODEASSIST_USER_DEFINED_TASKS)) {
+			reconcileForPropertyChange(false);
+		} else if (property.equals(AntEditorPreferenceConstants.BUILDFILE_NAMES_TO_IGNORE)
+				|| property.equals(AntEditorPreferenceConstants.BUILDFILE_IGNORE_ALL)) {
+			this.fReportingProblemsCurrent = false;
+			reconcileForPropertyChange(false);
 		}
 	};
 
@@ -1778,8 +1774,6 @@ public class AntModel implements IAntModel {
 
 	/**
 	 * Sets whether the AntModel should reconcile if it become dirty. If set to reconcile, a reconcile is triggered if the model is dirty.
-	 *
-	 * @param shouldReconcile
 	 */
 	public void setShouldReconcile(boolean shouldReconcile) {
 		fShouldReconcile = shouldReconcile;

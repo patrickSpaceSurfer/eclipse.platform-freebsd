@@ -172,8 +172,6 @@ public class SampleDebugTarget extends DebugElement implements IDebugTarget, IMe
 
 	/**
 	 * Remove the memory block from this debug session.
-	 *
-	 * @param memBlk
 	 */
 	public void removeMemoryBlock(IMemoryBlock memBlk) {
 		fMemoryBlocks.remove(memBlk);
@@ -219,7 +217,7 @@ public class SampleDebugTarget extends DebugElement implements IDebugTarget, IMe
 	public IMemoryBlockExtension getExtendedMemoryBlock(String expression, Object context) throws DebugException {
 
 		// ask debug engine for an address
-		BigInteger address = getEngine().evaluateExpression(expression, context);
+		BigInteger address = getEngine().evaluateExpression(expression);
 
 		// if address can be evaluated to an address, create memory block
 		if (address != null) {

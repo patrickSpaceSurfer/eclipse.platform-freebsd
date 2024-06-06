@@ -13,14 +13,12 @@
  *******************************************************************************/
 package org.eclipse.debug.tests.console;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.nio.charset.Charset;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -35,57 +33,74 @@ import org.junit.Test;
  * Tests the {@link InputStreamMonitor}.
  */
 public class InputStreamMonitorTests extends AbstractDebugTest {
+	private static int CONDITION_TIMEOUT_IN_MILLIS = 1_000;
 
 	/**
 	 * Simple test for input stream monitor. Write some bytes before starting
 	 * the monitor, some after and check if they are correctly transfered.
 	 */
 	@Test
-	@SuppressWarnings("resource")
 	public void testInputStreamMonitor() throws Exception {
-		PipedInputStream sysin = new PipedInputStream();
-		InputStreamMonitor monitor = new InputStreamMonitor(new PipedOutputStream(sysin));
-
-		byte[] content = new byte[100];
-		for (int i = 0; i < content.length; i++) {
-			content[i] = (byte) (i % 255);
-		}
-		try {
-			int half = content.length / 2;
-			monitor.write(content, 0, half);
+		InputStreamMonitor monitor = null;
+		try(PipedInputStream sysin = new PipedInputStream();
+				OutputStream outputFromSysin = new PipedOutputStream(sysin);
+		) {
+			monitor = new InputStreamMonitor(outputFromSysin);
+			byte[] originalContent = new byte[100];
+			for (int i = 0; i < originalContent.length; i++) {
+				originalContent[i] = (byte) (i % 255);
+			}
+			int half = originalContent.length / 2;
+			monitor.write(originalContent, 0, half);
 			monitor.startMonitoring();
-			monitor.write(content, half, content.length - half);
-			Thread.sleep(30);
+			monitor.write(originalContent, half, originalContent.length - half);
+			waitForElementsInStream(sysin, originalContent.length);
 
-			byte[] readBack = new byte[content.length];
-			int read = sysin.read(readBack);
-			assertEquals("Monitor wrote to few bytes.", read, content.length);
-			assertEquals("Monitor wrote to much bytes.", 0, sysin.available());
-			assertArrayEquals("Monitor wrote wrong content.", content, readBack);
+			byte[] contentWrittenByMonitor = new byte[originalContent.length];
+			sysin.read(contentWrittenByMonitor);
+			int additionalBytesWritten = sysin.available();
+			assertThat(additionalBytesWritten).isZero();
+			assertThat(contentWrittenByMonitor).isEqualTo(originalContent);
 		} finally {
-			monitor.close();
+			if (monitor != null) {
+				monitor.close();
+			}
 		}
+	}
+
+	private void waitForElementsInStream(PipedInputStream sysin, int numberOfElements) throws Exception {
+		TestUtil.waitWhile(() -> {
+			try {
+				return sysin.available() < numberOfElements;
+			} catch (IOException e) {
+				// Ignore and check again
+			}
+			return true;
+		}, CONDITION_TIMEOUT_IN_MILLIS);
+		assertThat(sysin.available()).isEqualTo(numberOfElements);
 	}
 
 	/**
 	 * Test that passing <code>null</code> as charset does not raise exceptions.
 	 */
 	@Test
-	@SuppressWarnings("resource")
 	public void testNullCharset() throws Exception {
-		PipedInputStream sysin = new PipedInputStream();
-		InputStreamMonitor monitor = new InputStreamMonitor(new PipedOutputStream(sysin), (Charset) null);
-		String text = "o\u00F6O\u00EFiI\u00D6\u00D8\u00F8";
-		try {
+		InputStreamMonitor monitor = null;
+		try (PipedInputStream sysin = new PipedInputStream(); OutputStream outputFromSysin = new PipedOutputStream(sysin);) {
+			monitor = new InputStreamMonitor(outputFromSysin);
+			String text = "o\u00F6O\u00EFiI\u00D6\u00D8\u00F8";
 			monitor.startMonitoring();
 			monitor.write(text);
-			Thread.sleep(30);
+			waitForElementsInStream(sysin, text.getBytes().length);
 
 			byte[] readBack = new byte[1000];
 			int len = sysin.read(readBack);
-			assertEquals("Monitor wrote wrong content.", text, new String(readBack, 0, len));
+			String readContent = new String(readBack, 0, len);
+			assertThat(readContent).isEqualTo(text);
 		} finally {
-			monitor.close();
+			if (monitor != null) {
+				monitor.close();
+			}
 		}
 	}
 
@@ -109,34 +124,34 @@ public class InputStreamMonitorTests extends AbstractDebugTest {
 		{
 			ClosableTestOutputStream testStream = new ClosableTestOutputStream();
 			InputStreamMonitor monitor = new InputStreamMonitor(testStream);
-			assertEquals("Stream closed to early.", 0, testStream.numClosed);
+			assertThat(testStream.numClosed).withFailMessage("stream closed too early").isZero();
 			monitor.closeInputStream();
-			TestUtil.waitWhile(() -> testStream.numClosed == 0, 100);
-			assertEquals("Stream not closed.", 1, testStream.numClosed);
+			TestUtil.waitWhile(() -> testStream.numClosed == 0, CONDITION_TIMEOUT_IN_MILLIS);
+			assertThat(testStream.numClosed).withFailMessage("stream not closed").isNotZero();
 		}
 		{
 			ClosableTestOutputStream testStream = new ClosableTestOutputStream();
 			InputStreamMonitor monitor = new InputStreamMonitor(testStream);
 			monitor.startMonitoring(threadName);
-			assertEquals("Stream closed to early.", 0, testStream.numClosed);
+			assertThat(testStream.numClosed).withFailMessage("stream closed too early").isZero();
 			monitor.close();
-			TestUtil.waitWhile(() -> testStream.numClosed == 0, 200);
-			assertEquals("Stream not closed.", 1, testStream.numClosed);
+			TestUtil.waitWhile(() -> testStream.numClosed == 0, CONDITION_TIMEOUT_IN_MILLIS);
+			assertThat(testStream.numClosed).withFailMessage("stream not closed").isNotZero();
 		}
 		{
 			ClosableTestOutputStream testStream = new ClosableTestOutputStream();
 			InputStreamMonitor monitor = new InputStreamMonitor(testStream);
 			monitor.startMonitoring(threadName);
-			assertEquals("Stream closed to early.", 0, testStream.numClosed);
+			assertThat(testStream.numClosed).withFailMessage("stream closed too early").isZero();
 			monitor.closeInputStream();
 			monitor.close();
 			monitor.close();
-			TestUtil.waitWhile(() -> testStream.numClosed == 0, 100);
-			assertEquals("Stream not closed or to often.", 1, testStream.numClosed);
+			TestUtil.waitWhile(() -> testStream.numClosed == 0, CONDITION_TIMEOUT_IN_MILLIS);
+			assertThat(testStream.numClosed).as("stream should be closed once").isEqualTo(1);
 		}
 
-		TestUtil.waitWhile(() -> getInputStreamMonitorThreads.get() > 0, 500);
-		assertEquals("Leaked monitor threads.", 0, (long) getInputStreamMonitorThreads.get());
+		TestUtil.waitWhile(() -> getInputStreamMonitorThreads.get() > 0, CONDITION_TIMEOUT_IN_MILLIS);
+		assertThat(getInputStreamMonitorThreads.get()).as("leaked monitor threads").isZero();
 	}
 
 	/**

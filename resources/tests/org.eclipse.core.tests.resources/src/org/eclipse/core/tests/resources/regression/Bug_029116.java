@@ -13,36 +13,38 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.regression;
 
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestPluginConstants.NATURE_29116;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectDescription;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.tests.resources.ResourceTest;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Rule;
+import org.junit.Test;
 
 /**
- * Test regression of bug 29116.  In this bug, triggering a builder during
+ * Test regression of bug 29116. In this bug, triggering a builder during
  * installation of a nature caused an assertion failure.
  */
-public class Bug_029116 extends ResourceTest {
-	public void testBug() {
+public class Bug_029116 {
+
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
+
+	@Test
+	public void testBug() throws CoreException {
 		// Create some resource handles
 		IProject project = getWorkspace().getRoot().getProject("PROJECT");
-
-		try {
-			// Create and open a project
-			project.create(getMonitor());
-			project.open(getMonitor());
-		} catch (CoreException e) {
-			fail("1.0", e);
-		}
+		// Create and open a project
+		project.create(createTestMonitor());
+		project.open(createTestMonitor());
 
 		// Create and set a build spec for the project
-		try {
-			IProjectDescription desc = project.getDescription();
-			desc.setNatureIds(new String[] {NATURE_29116});
-			project.setDescription(desc, getMonitor());
-		} catch (CoreException e) {
-			fail("2.0", e);
-		}
+		IProjectDescription desc = project.getDescription();
+		desc.setNatureIds(new String[] { NATURE_29116 });
+		project.setDescription(desc, createTestMonitor());
 	}
 
 }

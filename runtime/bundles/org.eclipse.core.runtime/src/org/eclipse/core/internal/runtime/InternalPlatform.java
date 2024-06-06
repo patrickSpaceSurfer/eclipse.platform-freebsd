@@ -18,6 +18,7 @@ package org.eclipse.core.internal.runtime;
 
 import java.io.File;
 import java.net.URL;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -57,6 +58,7 @@ import org.eclipse.equinox.internal.app.IBranding;
 import org.eclipse.equinox.log.ExtendedLogReaderService;
 import org.eclipse.equinox.log.ExtendedLogService;
 import org.eclipse.equinox.log.Logger;
+import org.eclipse.osgi.container.Module;
 import org.eclipse.osgi.container.ModuleContainer;
 import org.eclipse.osgi.framework.log.FrameworkLog;
 import org.eclipse.osgi.service.datalocation.Location;
@@ -429,10 +431,6 @@ public final class InternalPlatform {
 		return new Log(bundle, null);
 	}
 
-	public String getNL() {
-		return getBundleContext().getProperty(PROP_NL);
-	}
-
 	/**
 	 * Unicode locale extensions are defined using command line parameter -nlExtensions,
 	 * or the system property "osgi.nl.extensions".
@@ -457,17 +455,29 @@ public final class InternalPlatform {
 	}
 
 	public String getOS() {
-		return getBundleContext().getProperty(PROP_OS);
+		return getContextProperty(PROP_OS);
+	}
+
+	public String getWS() {
+		return getContextProperty(PROP_WS);
 	}
 
 	public String getOSArch() {
-		return getBundleContext().getProperty(PROP_ARCH);
+		return getContextProperty(PROP_ARCH);
+	}
+
+	public String getNL() {
+		return getContextProperty(PROP_NL);
+	}
+
+	private String getContextProperty(String key) {
+		BundleContext ctx = context;
+		return ctx != null ? ctx.getProperty(key) : System.getProperty(key);
 	}
 
 	public PlatformAdmin getPlatformAdmin() {
 		return platformTracker == null ? null : platformTracker.getService();
 	}
-
 
 	public IPreferencesService getPreferencesService() {
 		return preferencesTracker == null ? null : preferencesTracker.getService();
@@ -538,17 +548,13 @@ public final class InternalPlatform {
 	}
 
 	public long getStateTimeStamp() {
-		PlatformAdmin admin = getPlatformAdmin();
-		return admin == null ? -1 : admin.getState(false).getTimeStamp();
+		return Arrays.stream(getBundleContext().getBundles()).map(bundle -> bundle.adapt(Module.class))
+				.filter(Objects::nonNull).mapToLong(Module::getLastModified).sum();
 	}
 
 	public Location getUserLocation() {
 		assertInitialized();
 		return userLocation.getService();
-	}
-
-	public String getWS() {
-		return getBundleContext().getProperty(PROP_WS);
 	}
 
 	private void initializeAuthorizationHandler() {

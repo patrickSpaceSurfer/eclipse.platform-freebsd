@@ -13,16 +13,24 @@
  *******************************************************************************/
 package org.eclipse.compare.tests;
 
+import static java.util.function.Predicate.not;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.compareContent;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInputStream;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createRandomContentsStream;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+
 import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 
 import org.eclipse.compare.internal.Utilities;
-import org.eclipse.compare.internal.core.patch.FilePatch2;
 import org.eclipse.compare.internal.core.patch.FileDiffResult;
+import org.eclipse.compare.internal.core.patch.FilePatch2;
 import org.eclipse.compare.internal.core.patch.Hunk;
 import org.eclipse.compare.internal.patch.Patcher;
 import org.eclipse.compare.patch.ApplyPatchOperation;
@@ -36,18 +44,14 @@ import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.IStorage;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.runtime.IProgressMonitor;
-import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Rule;
+import org.junit.Test;
 
-public class FileDiffResultTest extends WorkspaceTest {
+public class FileDiffResultTest {
 
-	public FileDiffResultTest() {
-		super();
-	}
-
-	public FileDiffResultTest(String name) {
-		super(name);
-	}
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
 
 	private static final String PATCH_FILE = "patchfile";
 
@@ -55,163 +59,118 @@ public class FileDiffResultTest extends WorkspaceTest {
 
 	private static final String NEW_FILE_CONTENT = "Hi There";
 
-	private final IProgressMonitor nullProgressMonitor = new NullProgressMonitor();
-
 	private final PatchConfiguration patchConfiguration = new PatchConfiguration();
 
 	/**
 	 * Tests applying a patch which creates a new file in a project. The file
 	 * doesn't exist in the project.
-	 *
-	 * @throws CoreException
 	 */
-	public void testPatchAddsNewFile() throws CoreException {
-		IProject project = createProject("FileDiffResultTest",
-				new String[] { "oldfile" });
+	@Test
+	public void testPatchAddsNewFile() throws CoreException, IOException {
+		IProject project = getWorkspace().getRoot().getProject("FileDiffResultTest");
+		createInWorkspace(project);
+		createInWorkspace(project.getFile("oldfile"));
 
-		try {
-			// create the patch file
-			IFile file = project.getFile(PATCH_FILE);
-			file.create(new ByteArrayInputStream(createPatchAddingFile(project,
-					NEW_FILENAME, false /* the file doesn't exist */)
-					.getBytes()), true, null);
+		// create the patch file
+		IFile file = project.getFile(PATCH_FILE);
+		file.create(createInputStream(createPatchAddingFile(project, NEW_FILENAME, false /* the file doesn't exist */)),
+				true, null);
 
-			assertFalse(project.getFile(NEW_FILENAME).exists());
+		assertThat(project.getFile(NEW_FILENAME)).matches(not(IFile::exists), "does not exist");
 
-			IFilePatch[] filePatch = ApplyPatchOperation.parsePatch(file);
-			assertNotNull(filePatch);
-			assertEquals(1, filePatch.length);
+		IFilePatch[] filePatch = ApplyPatchOperation.parsePatch(file);
+		assertThat(filePatch).hasSize(1);
 
-			IFilePatchResult filePatchResult = filePatch[0].apply((IStorage)null,
-					patchConfiguration, nullProgressMonitor);
-			assertTrue(filePatchResult.hasMatches());
-			assertEquals(0, filePatchResult.getRejects().length);
-			assertEquals("", getStringFromStream(filePatchResult
-					.getOriginalContents()));
-			assertEquals(NEW_FILE_CONTENT, getStringFromStream(filePatchResult
-					.getPatchedContents()));
-
-		} catch (IOException e) {
-			fail();
-		}
+		IFilePatchResult filePatchResult = filePatch[0].apply((IStorage) null, patchConfiguration, createTestMonitor());
+		assertThat(filePatchResult).matches(IFilePatchResult::hasMatches, "has matches");
+		assertThat(filePatchResult.getRejects()).isEmpty();
+		assertThat(getStringFromStream(filePatchResult.getOriginalContents())).isEmpty();
+		assertThat(getStringFromStream(filePatchResult.getPatchedContents())).isEqualTo(NEW_FILE_CONTENT);
 	}
 
 	/**
 	 * Tests applying a patch which creates a new file in a project. The file
 	 * already exists in the project.
-	 *
-	 * @throws CoreException
 	 */
-	public void testPatchAddsExistingFileWithSameContents()
-			throws CoreException {
-		IProject project = createProject("FileDiffResultTest",
-				new String[] { NEW_FILENAME });
+	@Test
+	public void testPatchAddsExistingFileWithSameContents() throws CoreException, IOException {
+		IProject project = getWorkspace().getRoot().getProject("FileDiffResultTest");
+		createInWorkspace(project);
+		createInWorkspace(project.getFile(NEW_FILENAME));
+		project.getFile(NEW_FILENAME).setContents(createRandomContentsStream(), true, false, null);
 
-		try {
-			// create the patch file
-			IFile file = project.getFile(PATCH_FILE);
-			file.create(new ByteArrayInputStream(createPatchAddingFile(project,
-					NEW_FILENAME, true).getBytes()), true, null);
+		// create the patch file
+		IFile file = project.getFile(PATCH_FILE);
+		file.create(createInputStream(createPatchAddingFile(project, NEW_FILENAME, true)), true, null);
 
-			assertTrue(project.getFile(NEW_FILENAME).exists());
+		assertThat(project.getFile(NEW_FILENAME)).matches(IFile::exists, "exists");
 
-			IFilePatch[] filePatch = ApplyPatchOperation.parsePatch(file);
-			assertNotNull(filePatch);
-			assertEquals(1, filePatch.length);
+		IFilePatch[] filePatch = ApplyPatchOperation.parsePatch(file);
+		assertThat(filePatch).hasSize(1);
 
-			IFilePatchResult filePatchResult = filePatch[0].apply(project
-					.getFile(NEW_FILENAME), patchConfiguration,
-					nullProgressMonitor);
+		IFilePatchResult filePatchResult = filePatch[0].apply(project.getFile(NEW_FILENAME), patchConfiguration,
+				createTestMonitor());
 
-			assertFalse(filePatchResult.hasMatches());
-			assertEquals(1, filePatchResult.getRejects().length);
+		assertThat(filePatchResult).matches(not(IFilePatchResult::hasMatches), "has no matches");
+		assertThat(filePatchResult.getRejects()).hasSize(1);
 
-			assertNotNull(filePatchResult.getOriginalContents());
-			assertNotNull(filePatchResult.getPatchedContents());
+		assertThat(filePatchResult.getOriginalContents()).isNotNull();
+		assertThat(filePatchResult.getPatchedContents()).isNotNull();
 
-			assertEquals(new FileInputStream(project.getFile(NEW_FILENAME)
-					.getLocation().toFile()), filePatchResult
-					.getOriginalContents());
-			assertEquals(filePatchResult.getOriginalContents(), filePatchResult
-					.getPatchedContents());
-
-		} catch (IOException e) {
-			fail();
-		}
-
+		compareContent(new FileInputStream(project.getFile(NEW_FILENAME).getLocation().toFile()),
+				filePatchResult.getOriginalContents());
+		compareContent(filePatchResult.getOriginalContents(), filePatchResult.getPatchedContents());
 	}
 
 	/**
 	 * Tests applying a patch which creates a new file in a project. The file
 	 * already exists in the project, but has different contents.
-	 *
-	 * @throws CoreException
 	 */
-	public void testPatchAddsExistingFileWithDifferentContents()
-			throws CoreException {
-		IProject project = createProject("FileDiffResultTest",
-				new String[] { NEW_FILENAME });
+	@Test
+	public void testPatchAddsExistingFileWithDifferentContents() throws CoreException, IOException {
+		IProject project = getWorkspace().getRoot().getProject("FileDiffResultTest");
+		createInWorkspace(project);
+		createInWorkspace(project.getFile(NEW_FILENAME));
 
-		project.getFile(NEW_FILENAME).setContents(
-				new ByteArrayInputStream("I'm a different content".getBytes()),
-				IResource.NONE, null);
+		project.getFile(NEW_FILENAME).setContents(createInputStream("I'm a different content"), IResource.NONE, null);
 
-		try {
-			// create the patch file
-			IFile file = project.getFile(PATCH_FILE);
-			file.create(new ByteArrayInputStream(createPatchAddingFile(project,
-					NEW_FILENAME, false).getBytes()), true, null);
+		// create the patch file
+		IFile file = project.getFile(PATCH_FILE);
+		file.create(createInputStream(createPatchAddingFile(project, NEW_FILENAME, false)), true, null);
 
-			assertTrue(project.getFile(NEW_FILENAME).exists());
+		assertThat(project.getFile(NEW_FILENAME)).matches(IFile::exists, "exists");
 
-			IFilePatch[] filePatch = ApplyPatchOperation.parsePatch(file);
-			assertNotNull(filePatch);
-			assertEquals(1, filePatch.length);
+		IFilePatch[] filePatch = ApplyPatchOperation.parsePatch(file);
+		assertThat(filePatch).hasSize(1);
 
-			IFilePatchResult filePatchResult = filePatch[0].apply(project
-					.getFile(NEW_FILENAME), patchConfiguration,
-					nullProgressMonitor);
-			assertFalse(filePatchResult.hasMatches());
-			assertEquals(1, filePatchResult.getRejects().length);
+		IFilePatchResult filePatchResult = filePatch[0].apply(project.getFile(NEW_FILENAME), patchConfiguration,
+				createTestMonitor());
+		assertThat(filePatchResult).matches(not(IFilePatchResult::hasMatches), "has no matches");
+		assertThat(filePatchResult.getRejects()).hasSize(1);
 
-			assertNotNull(filePatchResult.getOriginalContents());
-			assertNotNull(filePatchResult.getPatchedContents());
+		assertThat(filePatchResult.getOriginalContents()).isNotNull();
+		assertThat(filePatchResult.getPatchedContents()).isNotNull();
 
-			assertEquals(new FileInputStream(project.getFile(NEW_FILENAME)
-					.getLocation().toFile()), filePatchResult
-					.getOriginalContents());
-			assertEquals("I'm a different content",
-					getStringFromStream(filePatchResult.getOriginalContents()));
-			assertEquals(filePatchResult.getOriginalContents(), filePatchResult
-					.getPatchedContents());
-
-		} catch (IOException e) {
-			fail();
-		}
-
+		compareContent(new FileInputStream(project.getFile(NEW_FILENAME).getLocation().toFile()),
+				filePatchResult.getOriginalContents());
+		assertThat(getStringFromStream(filePatchResult.getOriginalContents())).isEqualTo("I'm a different content");
+		compareContent(filePatchResult.getOriginalContents(), filePatchResult.getPatchedContents());
 	}
 
 	// https://bugs.eclipse.org/bugs/show_bug.cgi?id=185379
+	@Test
 	public void testFileDiffResultWithNullPath() {
 		MyFileDiff myFileDiff = new MyFileDiff();
-		FileDiffResult fileDiffResult = new FileDiffResult(myFileDiff,
-				patchConfiguration);
-		try {
-			fileDiffResult.calculateFuzz(new ArrayList<>(), nullProgressMonitor);
-		} catch (NullPointerException e) {
-			fail();
-		}
+		FileDiffResult fileDiffResult = new FileDiffResult(myFileDiff, patchConfiguration);
+		fileDiffResult.calculateFuzz(new ArrayList<>(), null);
 	}
 
 	// https://bugs.eclipse.org/bugs/show_bug.cgi?id=187365
+	@Test
 	public void testExcludePartOfNonWorkspacePatch() {
 		Patcher patcher = new Patcher();
 		MyFileDiff myFileDiff = new MyFileDiff();
-		try {
-			patcher.setEnabled(myFileDiff, false);
-		} catch (NullPointerException e) {
-			fail();
-		}
+		patcher.setEnabled(myFileDiff, false);
 	}
 
 	// utility methods
@@ -237,8 +196,6 @@ public class FileDiffResultTest extends WorkspaceTest {
 	 *            existing one. Enter <code>false</code>, if the file doesn't
 	 *            exist.
 	 * @return Content of the patch.
-	 * @throws IOException
-	 * @throws CoreException
 	 */
 	private String createPatchAddingFile(IProject project, String filename,
 			boolean sameContents) throws IOException, CoreException {
@@ -269,7 +226,6 @@ public class FileDiffResultTest extends WorkspaceTest {
 	 * @param in
 	 *            Input stream.
 	 * @return String read from the stream.
-	 * @throws IOException
 	 */
 	private static String getStringFromStream(InputStream in)
 			throws IOException {
@@ -282,43 +238,10 @@ public class FileDiffResultTest extends WorkspaceTest {
 	 * @param file
 	 *            A file.
 	 * @return Content of the file.
-	 * @throws IOException
-	 * @throws CoreException
 	 */
 	private static String getStringFromIFile(IFile file) throws IOException,
 			CoreException {
 		return getStringFromStream(new BufferedInputStream(file.getContents()));
 	}
 
-	/**
-	 * Check if two input streams are equal. They can't be null, all bytes need
-	 * to be the same, and they need to have same length.
-	 *
-	 * @param inputStream1
-	 *            First stream to check.
-	 * @param inputStream2
-	 *            Second stream to check.
-	 * @throws IOException
-	 */
-	private static void assertEquals(InputStream inputStream1,
-			InputStream inputStream2) throws IOException {
-
-		assertNotNull(inputStream1);
-		assertNotNull(inputStream2);
-
-		int byte1, byte2;
-		do {
-			byte1 = inputStream1.read();
-			byte2 = inputStream2.read();
-			// compare every byte of the streams
-			assertEquals(byte1, byte2);
-		} while (byte1 != -1 || byte2 != -1);
-
-		// the end of the streams should be reached at the same time
-		assertEquals(-1, byte1);
-		assertEquals(-1, byte2);
-
-		inputStream1.close();
-		inputStream2.close();
-	}
 }

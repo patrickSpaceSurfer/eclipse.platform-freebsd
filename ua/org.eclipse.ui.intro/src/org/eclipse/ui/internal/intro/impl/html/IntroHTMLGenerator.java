@@ -63,7 +63,6 @@ public class IntroHTMLGenerator {
 	 *
 	 * @param page
 	 *            the page to generate HTML for
-	 * @param providerSite
 	 */
 	public HTMLElement generateHTMLforPage(AbstractIntroPage page, IIntroContentProviderSite providerSite) {
 		if (page == null)
@@ -230,8 +229,6 @@ public class IntroHTMLGenerator {
 
 	/**
 	 * Add any browser-specific rendering quirks
-	 *
-	 * @param indentLevel
 	 */
 	private void addBrowserRenderingDirectives(HTMLElement head, int indentLevel) {
 		/* IE renders intranet content in Compat View by default */
@@ -512,6 +509,13 @@ public class IntroHTMLGenerator {
 			anchor2 = generateAnchorElement(element, indentLevel + 1);
 			labelAnchor = anchor2;
 		}
+		// add <IMG src="blank.gif">
+		String blankImageURL = BundleUtil.getResolvedResourceLocation(IIntroHTMLConstants.IMAGE_SRC_BLANK,
+				IIntroConstants.PLUGIN_ID);
+		if (blankImageURL != null) {
+			anchor1.addContent(generateImageElement(blankImageURL, null, null, IIntroHTMLConstants.IMAGE_CLASS_BG,
+					indentBase + 1));
+		}
 		// add link image, if one is specified
 		if (element.getImg() != null) {
 			HTMLElement img = generateIntroElement(element.getImg(), indentBase + 1);
@@ -629,22 +633,12 @@ public class IntroHTMLGenerator {
 		return textElement;
 	}
 
-	/**
-	 * @param element
-	 * @param indentLevel
-	 * @return
-	 */
 	private HTMLElement generateIntroInjectedIFrame(IntroInjectedIFrame element, int indentLevel) {
 		HTMLElement iframe = generateIFrameElement(element.getIFrameURL(), "0", //$NON-NLS-1$
 				"auto", indentLevel); //$NON-NLS-1$
 		return iframe;
 	}
 
-	/**
-	 * @param element
-	 * @param indentLevel
-	 * @return
-	 */
 	private HTMLElement generateIntroTitle(IntroPageTitle element, int indentLevel) {
 		HTMLElement titleElement = generateHeaderDiv(element.getId(), element.getStyleId(),
 				IIntroHTMLConstants.ELEMENT_H1, element.getTitle(), indentLevel);
@@ -689,10 +683,6 @@ public class IntroHTMLGenerator {
 
 	/**
 	 * Includes HTML content that is created by an IIntroContentProvider implementation.
-	 *
-	 * @param element
-	 * @param indentLevel
-	 * @return
 	 */
 	private HTMLElement generateIntroContent(IntroContentProvider element, int indentLevel) {
 		// create a new div to wrap the content
@@ -787,10 +777,6 @@ public class IntroHTMLGenerator {
 	 *
 	 *                      	&lt;BASE href=baseURL&gt;
 	 * </pre>
-	 *
-	 * @param indentLevel
-	 * @param baseURL
-	 * @return
 	 */
 	private HTMLElement generateBaseElement(int indentLevel, String baseURL) {
 		HTMLElement base = new FormattedHTMLElement(IIntroHTMLConstants.ELEMENT_BASE, indentLevel, true,
@@ -1222,8 +1208,6 @@ public class IntroHTMLGenerator {
 		 * above conditions are not met, no substitution occurs. If the above conditions are met,
 		 * the content between (and including) the opening and closing "$" characters will be
 		 * replaced by the absolute path to the plugin
-		 *
-		 * @return
 		 */
 		protected String parsePluginId() {
 			if (reader == null || tokenContent == null || pluginId == null)

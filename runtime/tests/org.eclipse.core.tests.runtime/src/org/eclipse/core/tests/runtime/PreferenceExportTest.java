@@ -20,8 +20,8 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.Plugin;
 import org.eclipse.core.runtime.Preferences;
-import org.junit.After;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests the Preferences import/export feature.
@@ -31,7 +31,7 @@ import org.junit.Test;
 @Deprecated
 public class PreferenceExportTest {
 
-	@After
+	@AfterEach
 	public void tearDown() throws Exception {
 		//remove properties modified by this test
 		Plugin testPlugin = RuntimeTestsPlugin.getPlugin();
@@ -46,8 +46,6 @@ public class PreferenceExportTest {
 	/**
 	 * Tests exporting a preference that is different from the default value, but
 	 * the same as the default-default value. See bug 31458.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testExportEmptyPreference() throws CoreException {
@@ -95,8 +93,6 @@ public class PreferenceExportTest {
 	 * Tests that identity tests on preference keys after export/import will still
 	 * work. This is to safeguard against programming errors in property change
 	 * listeners. See bug 20193.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testKeyIdentityAfterExport() throws CoreException {
@@ -107,12 +103,7 @@ public class PreferenceExportTest {
 		//add a property change listener that asserts key identity
 		Plugin testPlugin = RuntimeTestsPlugin.getPlugin();
 		Preferences prefs = testPlugin.getPluginPreferences();
-		Preferences.IPropertyChangeListener listener = new Preferences.IPropertyChangeListener() {
-			@Override
-			public void propertyChange(Preferences.PropertyChangeEvent event) {
-				assertSame("1.0", event.getProperty(), key);
-			}
-		};
+		Preferences.IPropertyChangeListener listener = event -> assertSame("1.0", event.getProperty(), key);
 		prefs.addPropertyChangeListener(listener);
 		try {
 			//add a preference on the runtime plugin

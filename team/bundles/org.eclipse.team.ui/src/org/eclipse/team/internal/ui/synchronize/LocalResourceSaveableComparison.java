@@ -161,7 +161,6 @@ public abstract class LocalResourceSaveableComparison extends SaveableComparison
 	/**
 	 * Flush the contents of any viewers into the compare input.
 	 * @param monitor a progress monitor
-	 * @throws CoreException
 	 */
 	protected void flushViewers(IProgressMonitor monitor) throws CoreException {
 		if (editorInput instanceof SaveablesCompareEditorInput) {
@@ -202,7 +201,7 @@ public abstract class LocalResourceSaveableComparison extends SaveableComparison
 				case 0:
 					return false;
 				// cancel
-				case 1:
+				default:
 					return true;
 			}
 		}
@@ -341,7 +340,6 @@ public abstract class LocalResourceSaveableComparison extends SaveableComparison
 		return false;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public <T> T getAdapter(Class<T> adapter) {
 		if (adapter == IDocument.class) {

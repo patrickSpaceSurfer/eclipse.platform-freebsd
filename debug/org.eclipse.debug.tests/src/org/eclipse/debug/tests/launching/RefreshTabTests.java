@@ -13,6 +13,7 @@
  *******************************************************************************/
 package org.eclipse.debug.tests.launching;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
@@ -68,8 +69,6 @@ public class RefreshTabTests extends AbstractLaunchTest {
 
 	/**
 	 * Tests a refresh scope of the selected resource
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testSelectedResource() throws CoreException {
@@ -77,15 +76,11 @@ public class RefreshTabTests extends AbstractLaunchTest {
 		IResource resource = getProject().getFolder("src"); //$NON-NLS-1$
 		setSelection(resource);
 		IResource[] result = RefreshTab.getRefreshResources(scope);
-		assertNotNull(result);
-		assertEquals(1, result.length);
-		assertEquals(resource, result[0]);
+		assertThat(result).containsExactly(resource);
 	}
 
 	/**
 	 * Tests a refresh scope of the selected resource's container
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testSelectionsFolder() throws CoreException {
@@ -93,15 +88,11 @@ public class RefreshTabTests extends AbstractLaunchTest {
 		IResource resource = getProject().getFolder("src"); //$NON-NLS-1$
 		setSelection(resource);
 		IResource[] result = RefreshTab.getRefreshResources(scope);
-		assertNotNull(result);
-		assertEquals(1, result.length);
-		assertEquals(resource.getParent(), result[0]);
+		assertThat(result).containsExactly(resource.getParent());
 	}
 
 	/**
 	 * Tests a refresh scope of the selected resource's project
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testSelectionsProject() throws CoreException {
@@ -109,59 +100,43 @@ public class RefreshTabTests extends AbstractLaunchTest {
 		IResource resource = getProject().getFolder("src"); //$NON-NLS-1$
 		setSelection(resource);
 		IResource[] result = RefreshTab.getRefreshResources(scope);
-		assertNotNull(result);
-		assertEquals(1, result.length);
-		assertEquals(resource.getProject(), result[0]);
+		assertThat(result).containsExactly(resource.getProject());
 	}
 
 	/**
 	 * Tests a refresh scope of the selected resource's project
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testWorkspaceScope() throws CoreException {
 		String scope = "${workspace}"; //$NON-NLS-1$
 		IResource[] result = RefreshTab.getRefreshResources(scope);
-		assertNotNull(result);
-		assertEquals(1, result.length);
-		assertEquals(ResourcesPlugin.getWorkspace().getRoot(), result[0]);
+		assertThat(result).containsExactly(ResourcesPlugin.getWorkspace().getRoot());
 	}
 
 	/**
 	 * Tests a refresh scope for a specific resource (old format)
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testSpecificResource() throws CoreException {
 		String scope = "${resource:/RefreshTabTests/some.file}"; //$NON-NLS-1$
 		IResource resource = getProject().getFile("some.file"); //$NON-NLS-1$
 		IResource[] result = RefreshTab.getRefreshResources(scope);
-		assertNotNull(result);
-		assertEquals(1, result.length);
-		assertEquals(resource, result[0]);
+		assertThat(result).containsExactly(resource);
 	}
 
 	/**
 	 * Tests a refresh scope for a working set
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testWorkingSet() throws CoreException {
 		String scope= "${working_set:<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<launchConfigurationWorkingSet factoryID=\"org.eclipse.ui.internal.WorkingSetFactory\" name=\"workingSet\" editPageId=\"org.eclipse.ui.resourceWorkingSetPage\">\n<item factoryID=\"org.eclipse.ui.internal.model.ResourceFactory\" path=\"/RefreshTabTests/some.file\" type=\"1\"/>\n</launchConfigurationWorkingSet>}"; //$NON-NLS-1$
 		IResource resource = getProject().getFile("some.file"); //$NON-NLS-1$
 		IResource[] result = RefreshTab.getRefreshResources(scope);
-		assertNotNull(result);
-		assertEquals(1, result.length);
-		assertEquals(resource, result[0]);
+		assertThat(result).containsExactly(resource);
 	}
 
 	/**
 	 * Returns a scratch project for launch configurations
-	 *
-	 * @return
 	 */
 	protected IProject getProject() throws CoreException {
 		IWorkspaceRoot root= ResourcesPlugin.getWorkspace().getRoot();
@@ -179,12 +154,9 @@ public class RefreshTabTests extends AbstractLaunchTest {
 	/**
 	 * Tests the launch configuration attribute comparator extension for
 	 * comparing old/new attribute styles.
-	 *
-	 * @throws CoreException
 	 */
-	@SuppressWarnings("restriction")
 	@Test
-	public void testRefreshScopeComparator() throws CoreException {
+	public void testRefreshScopeComparator() {
 		String oldStyle = "${working_set:<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<launchConfigurationWorkingSet factoryID=\"org.eclipse.ui.internal.WorkingSetFactory\" name=\"workingSet\" editPageId=\"org.eclipse.ui.resourceWorkingSetPage\">\n<item factoryID=\"org.eclipse.ui.internal.model.ResourceFactory\" path=\"/RefreshTabTests/some.file\" type=\"1\"/>\n</launchConfigurationWorkingSet>}"; //$NON-NLS-1$
 		String newStyle = "${working_set:<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<resources>\n<item path=\"/RefreshTabTests/some.file\" type=\"1\"/>\n</resources>}"; //$NON-NLS-1$
 		assertEquals("Comparator should return 0", 0, new RefreshScopeComparator().compare(oldStyle, newStyle)); //$NON-NLS-1$
@@ -210,31 +182,22 @@ public class RefreshTabTests extends AbstractLaunchTest {
 
 	/**
 	 * Tests persist restore of some resources.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testResourceMemento() throws CoreException {
 		IResource[] resources = new IResource[] { getProject(), getProject().getFile("not.exist"), getProject().getFile("some.file") }; //$NON-NLS-1$ //$NON-NLS-2$
 		String memento = RefreshUtil.toMemento(resources);
 		IResource[] restore = RefreshUtil.toResources(memento);
-		assertNotNull(resources);
-		assertEquals(resources.length, restore.length);
-		assertEquals(resources[0], restore[0]);
-		assertEquals(resources[1], restore[1]);
-		assertEquals(resources[2], restore[2]);
+		assertThat(restore).containsExactly(resources);
 	}
 
 	/**
 	 * Tests persist/restore of empty resource collection.
-	 *
-	 * @throws CoreException
 	 */
 	@Test
 	public void testEmptyResourceSet() throws CoreException {
 		String memento = RefreshUtil.toMemento(new IResource[]{});
 		IResource[] resources = RefreshUtil.toResources(memento);
-		assertNotNull(resources);
-		assertEquals("Should be empty", 0, resources.length); //$NON-NLS-1$
+		assertThat(resources).isEmpty();
 	}
 }

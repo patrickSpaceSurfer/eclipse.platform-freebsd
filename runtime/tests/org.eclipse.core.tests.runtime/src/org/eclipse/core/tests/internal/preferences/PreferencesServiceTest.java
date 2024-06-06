@@ -14,7 +14,7 @@
  *******************************************************************************/
 package org.eclipse.core.tests.internal.preferences;
 
-import static org.junit.Assert.assertArrayEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -54,11 +54,12 @@ import org.eclipse.core.runtime.preferences.IPreferencesService;
 import org.eclipse.core.runtime.preferences.IScopeContext;
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.core.runtime.preferences.PreferenceFilterEntry;
+import org.eclipse.core.runtime.preferences.UserScope;
 import org.eclipse.core.tests.harness.FileSystemHelper;
 import org.eclipse.core.tests.runtime.RuntimeTestsPlugin;
-import org.junit.After;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.osgi.service.prefs.BackingStoreException;
 import org.osgi.service.prefs.Preferences;
 
@@ -130,6 +131,12 @@ public class PreferencesServiceTest {
 			}
 		}
 	}
+
+	@AfterEach
+	public void tearDown() throws Exception {
+		Platform.getPreferencesService().getRootNode().node(TestScope.SCOPE).removeNode();
+	}
+
 
 	@Test
 	public void testImportExportBasic() throws Exception {
@@ -218,6 +225,7 @@ public class PreferencesServiceTest {
 		String[] defaultOrder = new String[] {"project", //$NON-NLS-1$
 				InstanceScope.SCOPE, //
 				ConfigurationScope.SCOPE, //
+				UserScope.SCOPE, //
 				DefaultScope.SCOPE};
 		String[] fullOrder = new String[] {"a", "b", "c"};
 		String[] nullKeyOrder = new String[] {"e", "f", "g"};
@@ -230,70 +238,39 @@ public class PreferencesServiceTest {
 				() -> service.setDefaultLookupOrder(qualifier, key, new String[] { "a", null, "b" }));
 
 		// nothing set
-		String[] order = service.getDefaultLookupOrder(qualifier, key);
-		assertNull("1.0", order);
-		order = service.getLookupOrder(qualifier, key);
-		assertNotNull("1.1", order);
-		assertArrayEquals("1.2", defaultOrder, order);
+		assertThat(service.getDefaultLookupOrder(qualifier, key)).isNull();
+		assertThat(service.getLookupOrder(qualifier, key)).containsExactly(defaultOrder);
 
-		order = service.getDefaultLookupOrder(qualifier, null);
-		assertNull("1.3", order);
-		order = service.getLookupOrder(qualifier, null);
-		assertNotNull("1.4", order);
-		assertArrayEquals("1.5", defaultOrder, order);
+		assertThat(service.getDefaultLookupOrder(qualifier, null)).isNull();
+		assertThat(service.getLookupOrder(qualifier, null)).containsExactly(defaultOrder);
 
 		// set for qualifier/key
 		service.setDefaultLookupOrder(qualifier, key, fullOrder);
-		order = service.getDefaultLookupOrder(qualifier, key);
-		assertNotNull("2.2", order);
-		assertArrayEquals("2.3", fullOrder, order);
-		order = service.getLookupOrder(qualifier, key);
-		assertNotNull("2.4", order);
-		assertArrayEquals("2.5", fullOrder, order);
+		assertThat(service.getDefaultLookupOrder(qualifier, key)).containsExactly(fullOrder);
+		assertThat(service.getLookupOrder(qualifier, key)).containsExactly(fullOrder);
 
 		// nothing set for qualifier/null
-		order = service.getDefaultLookupOrder(qualifier, null);
-		assertNull("3.0", order);
-		order = service.getLookupOrder(qualifier, null);
-		assertNotNull("3.1", order);
-		assertArrayEquals("3.2", defaultOrder, order);
+		assertThat(service.getDefaultLookupOrder(qualifier, null)).isNull();
+		assertThat(service.getLookupOrder(qualifier, null)).containsExactly(defaultOrder);
 
 		// set for qualifier/null
 		service.setDefaultLookupOrder(qualifier, null, nullKeyOrder);
-		order = service.getDefaultLookupOrder(qualifier, null);
-		assertNotNull("4.0", order);
-		assertArrayEquals("4.1", nullKeyOrder, order);
-		order = service.getLookupOrder(qualifier, null);
-		assertNotNull("4.2", order);
-		assertArrayEquals("4.3", nullKeyOrder, order);
-		order = service.getDefaultLookupOrder(qualifier, key);
-		assertNotNull("4.4", order);
-		assertArrayEquals("4.5", fullOrder, order);
-		order = service.getLookupOrder(qualifier, key);
-		assertNotNull("4.6", order);
-		assertArrayEquals("4.7", fullOrder, order);
+		assertThat(service.getDefaultLookupOrder(qualifier, null)).containsExactly(nullKeyOrder);
+		assertThat(service.getLookupOrder(qualifier, null)).containsExactly(nullKeyOrder);
+		assertThat(service.getDefaultLookupOrder(qualifier, key)).containsExactly(fullOrder);
+		assertThat(service.getLookupOrder(qualifier, key)).containsExactly(fullOrder);
 
 		// clear qualifier/key (find qualifier/null)
 		service.setDefaultLookupOrder(qualifier, key, null);
-		order = service.getDefaultLookupOrder(qualifier, key);
-		assertNull("5.0", order);
-		order = service.getLookupOrder(qualifier, key);
-		assertNotNull("5.1", order);
-		assertArrayEquals("5.2", nullKeyOrder, order);
+		assertThat(service.getDefaultLookupOrder(qualifier, key)).isNull();
+		assertThat(service.getLookupOrder(qualifier, key)).containsExactly(nullKeyOrder);
 
 		// clear qualifier/null (find returns default-default)
 		service.setDefaultLookupOrder(qualifier, null, null);
-		order = service.getDefaultLookupOrder(qualifier, key);
-		assertNull("6.0", order);
-		order = service.getLookupOrder(qualifier, key);
-		assertNotNull("6.1", order);
-		assertArrayEquals("6.2", defaultOrder, order);
-
-		order = service.getDefaultLookupOrder(qualifier, null);
-		assertNull("6.3", order);
-		order = service.getLookupOrder(qualifier, null);
-		assertNotNull("6.4", order);
-		assertArrayEquals("6.5", defaultOrder, order);
+		assertThat(service.getDefaultLookupOrder(qualifier, key)).isNull();
+		assertThat(service.getLookupOrder(qualifier, key)).containsExactly(defaultOrder);
+		assertThat(service.getDefaultLookupOrder(qualifier, null)).isNull();
+		assertThat(service.getLookupOrder(qualifier, null)).containsExactly(defaultOrder);
 	}
 
 	@Test
@@ -417,8 +394,7 @@ public class PreferencesServiceTest {
 		String[] setOrder = new String[] {TestScope.SCOPE, DefaultScope.SCOPE};
 		service.setDefaultLookupOrder(qualifier, null, setOrder);
 		String[] order = service.getLookupOrder(qualifier, null);
-		assertNotNull("6.0", order);
-		assertArrayEquals("6.1", setOrder, order);
+		assertThat(order).containsExactly(setOrder);
 
 		// get the value, should be the real one
 		for (int i = 0; i < contexts.length; i++) {
@@ -431,8 +407,7 @@ public class PreferencesServiceTest {
 		setOrder = new String[] {DefaultScope.SCOPE, TestScope.SCOPE};
 		service.setDefaultLookupOrder(qualifier, key, setOrder);
 		order = service.getLookupOrder(qualifier, key);
-		assertNotNull("8.0", order);
-		assertArrayEquals("8.1", setOrder, order);
+		assertThat(order).containsExactly(setOrder);
 
 		// get the value, should be the default one
 		for (int i = 0; i < contexts.length; i++) {
@@ -440,11 +415,6 @@ public class PreferencesServiceTest {
 			assertNotNull("9.0." + i, actual);
 			assertEquals("9.1." + i, defaultValue, actual);
 		}
-	}
-
-	@After
-	public void tearDown() throws Exception {
-		Platform.getPreferencesService().getRootNode().node(TestScope.SCOPE).removeNode();
 	}
 
 	@Test
@@ -717,7 +687,6 @@ public class PreferencesServiceTest {
 	}
 
 	/**
-	 * @throws Exception
 	 * @deprecated this tests deprecated functions, so deprecation added to avoid
 	 *             warnings
 	 */
@@ -777,7 +746,7 @@ public class PreferencesServiceTest {
 
 		// an empty transfer list matches nothing
 		matching = service.matches(service.getRootNode(), new IPreferenceFilter[0]);
-		assertEquals("1.1", 0, matching.length);
+		assertThat(matching).isEmpty();
 
 		// don't match this filter
 		IPreferenceFilter filter = new IPreferenceFilter() {
@@ -794,24 +763,24 @@ public class PreferencesServiceTest {
 			}
 		};
 		matching = service.matches(service.getRootNode(), new IPreferenceFilter[] { filter });
-		assertEquals("2.1", 0, matching.length);
+		assertThat(matching).isEmpty();
 
 		// shouldn't match since there are no key/value pairs in the node
 		matching = service.matches(service.getRootNode(), new IPreferenceFilter[] { filter });
-		assertEquals("3.0", 0, matching.length);
+		assertThat(matching).isEmpty();
 
 		// add some values so it does match
 		InstanceScope.INSTANCE.getNode(QUALIFIER).put("key", "value");
 		matching = service.matches(service.getRootNode(), new IPreferenceFilter[] { filter });
-		assertEquals("3.1", 1, matching.length);
+		assertThat(matching).hasSize(1);
 
 		// should match on the exact node too
 		matching = service.matches(InstanceScope.INSTANCE.getNode(QUALIFIER), new IPreferenceFilter[] { filter });
-		assertEquals("4.1", 1, matching.length);
+		assertThat(matching).hasSize(1);
 
 		// shouldn't match a different scope
 		matching = service.matches(ConfigurationScope.INSTANCE.getNode(QUALIFIER), new IPreferenceFilter[] { filter });
-		assertEquals("5.1", 0, matching.length);
+		assertThat(matching).isEmpty();
 
 		// try matching on the root node for a filter which matches all nodes in the scope
 		filter = new IPreferenceFilter() {
@@ -826,11 +795,11 @@ public class PreferencesServiceTest {
 			}
 		};
 		matching = service.matches(InstanceScope.INSTANCE.getNode(QUALIFIER), new IPreferenceFilter[] { filter });
-		assertEquals("6.1", 1, matching.length);
+		assertThat(matching).hasSize(1);
 
 		// shouldn't match
 		matching = service.matches(ConfigurationScope.INSTANCE.getNode(QUALIFIER), new IPreferenceFilter[] { filter });
-		assertEquals("7.1", 0, matching.length);
+		assertThat(matching).isEmpty();
 	}
 
 	/*
@@ -857,7 +826,7 @@ public class PreferencesServiceTest {
 				return new String[] {InstanceScope.SCOPE};
 			}
 		}};
-		assertEquals("1.0", 1, service.matches(service.getRootNode(), filters).length);
+		assertThat(service.matches(service.getRootNode(), filters)).hasSize(1);
 	}
 
 	@Test
@@ -1029,7 +998,7 @@ public class PreferencesServiceTest {
 		node.put(VALID_KEY_4, "value4");
 
 		matching = service.matches(service.getRootNode(), new IPreferenceFilter[] { transfer });
-		assertEquals("2.00", 1, matching.length);
+		assertThat(matching).hasSize(1);
 
 		ExportVerifier verifier = new ExportVerifier(service.getRootNode(), new IPreferenceFilter[] {transfer});
 		verifier.addVersion();
@@ -1091,23 +1060,23 @@ public class PreferencesServiceTest {
 		}
 		String debugString = ((EclipsePreferences) node).toDeepDebugString();
 		String[] children = node.childrenNames();
-		assertEquals(debugString, 1, children.length);
+		assertThat(children).as(debugString).hasSize(1);
 
 		assertEquals(InstanceScope.SCOPE, children[0]);
 		node = node.node(children[0]);
 		children = node.childrenNames();
-		assertEquals(debugString, 1, children.length);
+		assertThat(children).as(debugString).hasSize(1);
 
 		assertEquals("bug418046", children[0]);
 		node = node.node(children[0]);
 		children = node.childrenNames();
-		assertEquals(debugString, 0, children.length);
+		assertThat(children).as(debugString).isEmpty();
 
 		assertEquals(debugString, "someValue", node.get("someKey", null));
 	}
 
 	@Test
-	@Ignore("not implemented yet")
+	@Disabled("not implemented yet")
 	public void testApplyWithTransfers() {
 	}
 

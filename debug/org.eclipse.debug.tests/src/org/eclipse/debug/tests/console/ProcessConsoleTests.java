@@ -13,7 +13,8 @@
  *******************************************************************************/
 package org.eclipse.debug.tests.console;
 
-import static org.junit.Assert.assertArrayEquals;
+import static java.nio.file.Files.readAllBytes;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -27,12 +28,17 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.eclipse.core.runtime.ILogListener;
 import org.eclipse.core.runtime.IStatus;
@@ -70,15 +76,15 @@ import org.junit.Test;
  */
 public class ProcessConsoleTests extends AbstractDebugTest {
 	/**
-	 * Number of received log messages with severity error while running a
-	 * single test method.
+	 * Log messages with severity error received while running a single test
+	 * method.
 	 */
-	private final AtomicInteger loggedErrors = new AtomicInteger(0);
+	private final List<IStatus> loggedErrors = Collections.synchronizedList(new ArrayList<>());
 
 	/** Listener to count error messages in {@link ConsolePlugin} log. */
 	private final ILogListener errorLogListener = (status, plugin) -> {
 			if (status.matches(IStatus.ERROR)) {
-				loggedErrors.incrementAndGet();
+				loggedErrors.add(status);
 			}
 	};
 
@@ -89,7 +95,7 @@ public class ProcessConsoleTests extends AbstractDebugTest {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		loggedErrors.set(0);
+		loggedErrors.clear();
 		Platform.addLogListener(errorLogListener);
 	}
 
@@ -104,7 +110,18 @@ public class ProcessConsoleTests extends AbstractDebugTest {
 
 		super.tearDown();
 
-		assertEquals("Test triggered errors.", 0, loggedErrors.get());
+		assertThat(errorsToStrings()).as("logged errors").isEmpty();
+	}
+
+	private Stream<String> errorsToStrings() {
+		return loggedErrors.stream().map(status -> status.toString() + throwableToString(status.getException()));
+	}
+
+	private static String throwableToString(Throwable throwable) {
+		if (throwable == null) {
+			return "";
+		}
+		return System.lineSeparator() + "Stack trace: " + Stream.of(throwable.getStackTrace()).map(Object::toString).collect(Collectors.joining(System.lineSeparator()));
 	}
 
 	/**
@@ -210,10 +227,10 @@ public class ProcessConsoleTests extends AbstractDebugTest {
 				console.initialize();
 				@SuppressWarnings("restriction")
 				final Class<?> jobFamily = org.eclipse.debug.internal.ui.views.console.ProcessConsole.class;
-				assertTrue("Input read job not started.", Job.getJobManager().find(jobFamily).length > 0);
+				assertThat(Job.getJobManager().find(jobFamily)).as("check input read job started").hasSizeGreaterThan(0);
 				Job.getJobManager().cancel(jobFamily);
 				TestUtil.waitForJobs(name.getMethodName(), 0, 1000);
-				assertEquals("Input read job not canceled.", 0, Job.getJobManager().find(jobFamily).length);
+				assertThat(Job.getJobManager().find(jobFamily)).as("check input read job is canceled").isEmpty();
 			} finally {
 				console.destroy();
 			}
@@ -299,7 +316,7 @@ public class ProcessConsoleTests extends AbstractDebugTest {
 		launchConfigAttributes.put(IDebugUIConstants.ATTR_CAPTURE_IN_FILE, outFile.getCanonicalPath());
 		launchConfigAttributes.put(IDebugUIConstants.ATTR_CAPTURE_IN_CONSOLE, true);
 		doConsoleOutputTest(testContent.getBytes(), launchConfigAttributes);
-		assertArrayEquals("Wrong content redirected to file.", testContent.getBytes(), Files.readAllBytes(outFile.toPath()));
+		assertThat(readAllBytes(outFile.toPath())).as("content redirected to file").containsExactly(testContent.getBytes());
 	}
 
 	/**
@@ -314,11 +331,11 @@ public class ProcessConsoleTests extends AbstractDebugTest {
 		launchConfigAttributes.put(IDebugUIConstants.ATTR_APPEND_TO_FILE, true);
 		launchConfigAttributes.put(IDebugUIConstants.ATTR_CAPTURE_IN_CONSOLE, true);
 		doConsoleOutputTest(testContent.getBytes(), launchConfigAttributes);
-		assertArrayEquals("Wrong content redirected to file.", testContent.getBytes(), Files.readAllBytes(outFile.toPath()));
+		assertThat(readAllBytes(outFile.toPath())).as("content redirected to file").containsExactly(testContent.getBytes());
 
 		String appendedContent = "append";
 		doConsoleOutputTest(appendedContent.getBytes(), launchConfigAttributes);
-		assertArrayEquals("Wrong content redirected to file.", (testContent + appendedContent).getBytes(), Files.readAllBytes(outFile.toPath()));
+		assertThat(readAllBytes(outFile.toPath())).as("content redirected to file").containsExactly((testContent + appendedContent).getBytes());
 	}
 
 	/**
@@ -336,19 +353,19 @@ public class ProcessConsoleTests extends AbstractDebugTest {
 		launchConfigAttributes.put(IDebugUIConstants.ATTR_CAPTURE_IN_FILE, outFile.getCanonicalPath());
 		launchConfigAttributes.put(IDebugUIConstants.ATTR_CAPTURE_IN_CONSOLE, false);
 		IOConsole console = doConsoleOutputTest(testContent.getBytes(), launchConfigAttributes);
-		assertArrayEquals("Wrong content redirected to file.", testContent.getBytes(), Files.readAllBytes(outFile.toPath()));
+		assertThat(readAllBytes(outFile.toPath())).as("content redirected to file").containsExactly(testContent.getBytes());
 		assertEquals("Output in console.", 2, console.getDocument().getNumberOfLines());
 
 		outFile = createTmpFile("exhaustive[128-32].out");
 		launchConfigAttributes.put(IDebugUIConstants.ATTR_CAPTURE_IN_FILE, outFile.getCanonicalPath());
 		console = doConsoleOutputTest(testContent.getBytes(), launchConfigAttributes);
-		assertArrayEquals("Wrong content redirected to file.", testContent.getBytes(), Files.readAllBytes(outFile.toPath()));
+		assertThat(readAllBytes(outFile.toPath())).as("content redirected to file").containsExactly(testContent.getBytes());
 		assertEquals("Output in console.", 2, console.getDocument().getNumberOfLines());
 
 		outFile = createTmpFile("ug(ly.out");
 		launchConfigAttributes.put(IDebugUIConstants.ATTR_CAPTURE_IN_FILE, outFile.getCanonicalPath());
 		console = doConsoleOutputTest(testContent.getBytes(), launchConfigAttributes);
-		assertArrayEquals("Wrong content redirected to file.", testContent.getBytes(), Files.readAllBytes(outFile.toPath()));
+		assertThat(readAllBytes(outFile.toPath())).as("content redirected to file").containsExactly(testContent.getBytes());
 		assertEquals("Output in console.", 2, console.getDocument().getNumberOfLines());
 	}
 
@@ -394,7 +411,7 @@ public class ProcessConsoleTests extends AbstractDebugTest {
 				String expectedPathMsg = MessageFormat.format(org.eclipse.debug.internal.ui.views.console.ConsoleMessages.ProcessConsole_1, new Object[] {
 						outFile.getAbsolutePath() });
 				assertEquals("No or wrong output of redirect file path in console.", expectedPathMsg, doc.get(doc.getLineOffset(0), doc.getLineLength(0)));
-				assertEquals("Expected redirect file path to be linked.", 1, console.getHyperlinks().length);
+				assertThat(console.getHyperlinks()).as("check redirect file path is linked").hasSize(1);
 			}
 			if (checkOutput) {
 				assertEquals("Output not found in console.", new String(testContent), doc.get(doc.getLineOffset(1), doc.getLineLength(1)));
@@ -440,7 +457,21 @@ public class ProcessConsoleTests extends AbstractDebugTest {
 					sysout.println(lines[4]);
 					mockProcess.destroy();
 					sysout.close();
-					TestUtil.processUIEvents(200);
+
+					Predicate<AbstractDebugTest> waitForLastLineWritten = __ -> {
+						try {
+							TestUtil.processUIEvents(50);
+						} catch (Exception e) {
+							// try again
+						}
+						return console.getDocument().getNumberOfLines() < lines.length;
+					};
+					Function<AbstractDebugTest, String> errorMessageProvider = __ -> {
+						String expected = String.join(System.lineSeparator(), lines);
+						String actual = console.getDocument().get();
+						return "Not all lines have been written, expected: " + expected + ", was: " + actual;
+					};
+					waitWhile(waitForLastLineWritten, testTimeout, errorMessageProvider);
 
 					for (int i = 0; i < lines.length; i++) {
 						IRegion lineInfo = console.getDocument().getLineInformation(i);
@@ -478,7 +509,26 @@ public class ProcessConsoleTests extends AbstractDebugTest {
 			final org.eclipse.debug.internal.ui.views.console.ProcessConsole console = new org.eclipse.debug.internal.ui.views.console.ProcessConsole(process, new ConsoleColorProvider(), consoleEncoding);
 			try {
 				console.initialize();
-				mockProcess.waitFor(100, TimeUnit.MILLISECONDS);
+
+				Predicate<AbstractDebugTest> waitForFileWritten = __ -> {
+					try {
+						TestUtil.processUIEvents(20);
+						return readAllBytes(outFile.toPath()).length < output.length;
+					} catch (Exception e) {
+						// try again
+					}
+					return false;
+				};
+				Function<AbstractDebugTest, String> errorMessageProvider = __ -> {
+					byte[] actualOutput = new byte[0];
+					try {
+						actualOutput = readAllBytes(outFile.toPath());
+					} catch (IOException e) {
+						// Proceed as if output was empty
+					}
+					return "File has not been written, expected: " + Arrays.toString(output) + ", was: " + Arrays.toString(actualOutput);
+				};
+				waitWhile(waitForFileWritten, testTimeout, errorMessageProvider);
 				mockProcess.destroy();
 			} finally {
 				console.destroy();
@@ -488,7 +538,7 @@ public class ProcessConsoleTests extends AbstractDebugTest {
 		}
 
 		byte[] receivedOutput = Files.readAllBytes(outFile.toPath());
-		assertArrayEquals(output, receivedOutput);
+		assertThat(receivedOutput).as("received output").isEqualTo(output);
 	}
 
 	/**
@@ -523,6 +573,6 @@ public class ProcessConsoleTests extends AbstractDebugTest {
 		}
 
 		byte[] receivedInput = mockProcess.getReceivedInput();
-		assertArrayEquals(input, receivedInput);
+		assertThat(receivedInput).as("received input").isEqualTo(input);
 	}
 }

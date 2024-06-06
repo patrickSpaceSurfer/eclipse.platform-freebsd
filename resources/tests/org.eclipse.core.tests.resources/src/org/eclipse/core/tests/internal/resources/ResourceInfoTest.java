@@ -14,59 +14,30 @@
  *******************************************************************************/
 package org.eclipse.core.tests.internal.resources;
 
+import static org.junit.Assert.assertTrue;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.Map;
-
 import org.eclipse.core.internal.resources.ResourceInfo;
 import org.eclipse.core.runtime.QualifiedName;
-import org.eclipse.core.tests.resources.ResourceTest;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Rule;
+import org.junit.Test;
 
-public class ResourceInfoTest extends ResourceTest {
+public class ResourceInfoTest {
 
-	static public void assertEquals(String message, byte[] expected, byte[] actual) {
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
+
+	static public void assertEquals(ResourceInfo expected, ResourceInfo actual) {
 		if (expected == null && actual == null) {
 			return;
 		}
 		if (expected == null || actual == null) {
-			assertTrue(message, false);
-		}
-		assertEquals(message, expected.length, actual.length);
-		for (int i = 0; i < expected.length; i++) {
-			assertEquals(message, expected[i], actual[i]);
-		}
-	}
-
-	static public void assertEquals(String message, Map<?, ?> expected, Map<?, ?> actual) {
-		if (expected == null && actual == null) {
-			return;
-		}
-		if (expected == null || actual == null) {
-			assertTrue(message, false);
-		}
-		assertEquals(message, expected.size(), actual.size());
-		for (Map.Entry<?, ?> entry : expected.entrySet()) {
-			Object key = entry.getKey();
-			assertTrue(message, actual.containsKey(key));
-			Object expectedValue = entry.getValue();
-			Object actualValue = actual.get(key);
-			if (expectedValue instanceof byte[] expectedB && actualValue instanceof byte[] actualB) {
-				assertEquals(message, expectedB, actualB);
-			} else {
-				assertEquals(message, expectedValue, actualValue);
-			}
-		}
-	}
-
-	static public void assertEquals(String message, ResourceInfo expected, ResourceInfo actual) {
-		if (expected == null && actual == null) {
-			return;
-		}
-		if (expected == null || actual == null) {
-			assertTrue(message, false);
+			assertTrue(false);
 		}
 		boolean different = false;
 		different &= expected.getFlags() == actual.getFlags();
@@ -78,30 +49,23 @@ public class ResourceInfoTest extends ResourceTest {
 		//	assertEquals(message, expected.getSyncInfo(false), actual.getSyncInfo(false));
 		different &= expected.getMarkerGenerationCount() == actual.getMarkerGenerationCount();
 		if (different) {
-			assertTrue(message, false);
+			assertTrue(false);
 		}
 	}
 
-	public void testSerialization() {
+	@Test
+	public void testSerialization() throws IOException {
 		ByteArrayInputStream input = null;
 		ByteArrayOutputStream output = null;
 		ResourceInfo info = new ResourceInfo();
 		ResourceInfo newInfo = new ResourceInfo();
 
 		// write out an empty info
-		try {
-			output = new ByteArrayOutputStream();
-			info.writeTo(new DataOutputStream(output));
-		} catch (IOException e) {
-			fail("1.0", e);
-		}
-		try {
-			input = new ByteArrayInputStream(output.toByteArray());
-			newInfo.readFrom(0, new DataInputStream(input));
-		} catch (IOException e) {
-			fail("1.1", e);
-		}
-		assertEquals("1.2", info, newInfo);
+		output = new ByteArrayOutputStream();
+		info.writeTo(new DataOutputStream(output));
+		input = new ByteArrayInputStream(output.toByteArray());
+		newInfo.readFrom(0, new DataInputStream(input));
+		assertEquals(info, newInfo);
 
 		// write and info with syncinfo set
 		info = new ResourceInfo();
@@ -113,19 +77,12 @@ public class ResourceInfoTest extends ResourceTest {
 		qname = new QualifiedName("org.eclipse.core.tests", "myTest2");
 		bytes = new byte[] {0, 1, 2, 3, 4, 5};
 		info.setSyncInfo(qname, bytes);
-		try {
-			output = new ByteArrayOutputStream();
-			info.writeTo(new DataOutputStream(output));
-		} catch (IOException e) {
-			fail("2.0", e);
-		}
-		try {
-			newInfo = new ResourceInfo();
-			input = new ByteArrayInputStream(output.toByteArray());
-			newInfo.readFrom(0, new DataInputStream(input));
-		} catch (IOException e) {
-			fail("2.1", e);
-		}
-		assertEquals("2.2", info, newInfo);
+		output = new ByteArrayOutputStream();
+		info.writeTo(new DataOutputStream(output));
+		newInfo = new ResourceInfo();
+		input = new ByteArrayInputStream(output.toByteArray());
+		newInfo.readFrom(0, new DataInputStream(input));
+		assertEquals(info, newInfo);
 	}
+
 }

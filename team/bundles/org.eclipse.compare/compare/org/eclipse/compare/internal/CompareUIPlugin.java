@@ -33,9 +33,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.StringTokenizer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.eclipse.compare.CompareConfiguration;
 import org.eclipse.compare.CompareEditorInput;
@@ -77,6 +80,7 @@ import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
+import org.eclipse.ui.IEditorDescriptor;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.IEditorRegistry;
@@ -192,6 +196,10 @@ public final class CompareUIPlugin extends AbstractUIPlugin {
 				return fExtensionMap.get(normalizeCase(extension));
 			return null;
 		}
+
+		Collection<T> getAll() {
+			return fIdMap == null ? Collections.emptySet() : fIdMap.values();
+		}
 	}
 
 	/** Status code describing an internal error */
@@ -303,9 +311,7 @@ public final class CompareUIPlugin extends AbstractUIPlugin {
 		super.stop(context);
 
 		if (fgDisposeOnShutdownImages != null) {
-			Iterator<Image> i= fgDisposeOnShutdownImages.iterator();
-			while (i.hasNext()) {
-				Image img= i.next();
+			for (Image img : fgDisposeOnShutdownImages) {
 				if (!img.isDisposed())
 					img.dispose();
 			}
@@ -808,10 +814,8 @@ public final class CompareUIPlugin extends AbstractUIPlugin {
 
 	public ViewerDescriptor[] findStructureViewerDescriptor(Viewer oldViewer,
 			ICompareInput input, CompareConfiguration configuration) {
-		if (input == null)
-			return null;
 		// we don't show the structure of additions or deletions
-		if (input == null || input.getLeft() == null || input.getRight() == null)
+		if ((input == null) || input == null || input.getLeft() == null || input.getRight() == null)
 			return null;
 
 		Set<ViewerDescriptor> result = new LinkedHashSet<>();
@@ -895,9 +899,7 @@ public final class CompareUIPlugin extends AbstractUIPlugin {
 			return new CompareFilterDescriptor[0];
 		}
 		Set<CompareFilterDescriptor> result = new LinkedHashSet<>();
-		Iterator<Object> ctIterator = contentTypes.iterator();
-		while (ctIterator.hasNext()) {
-			Object ct = ctIterator.next();
+		for (Object ct : contentTypes) {
 			if (ct instanceof IContentType) {
 				List<CompareFilterDescriptor> list = fCompareFilters.searchAll((IContentType) ct);
 				if (list != null)
@@ -989,7 +991,7 @@ public final class CompareUIPlugin extends AbstractUIPlugin {
 	}
 
 	public ViewerDescriptor[] findContentViewerDescriptor(Viewer oldViewer, Object in, CompareConfiguration cc) {
-		Set<ViewerDescriptor> result = new LinkedHashSet<>();
+		LinkedHashSet<ViewerDescriptor> result = new LinkedHashSet<>();
 		if (in instanceof IStreamContentAccessor) {
 			String type= ITypedElement.TEXT_TYPE;
 
@@ -1022,13 +1024,17 @@ public final class CompareUIPlugin extends AbstractUIPlugin {
 			return null;
 
 		ICompareInput input= (ICompareInput) in;
+		String name = input.getName();
 
 		IContentType ctype = getCommonType(input);
 		if (ctype != null) {
 			initializeRegistries();
 			List<ViewerDescriptor> list = fContentMergeViewers.searchAll(ctype);
-			if (list != null)
+			if (list != null) {
 				result.addAll(list);
+			}
+			// Add a hint for the viewers which content type we have detected
+			cc.setProperty(CompareConfiguration.CONTENT_TYPE, ctype.getId());
 		}
 
 		String[] types= getTypes(input);
@@ -1060,6 +1066,9 @@ public final class CompareUIPlugin extends AbstractUIPlugin {
 				result.addAll(list);
 		}
 
+		Set<ViewerDescriptor> editorLinkedDescriptors = findEditorLinkedDescriptors(name, ctype, false);
+		result.addAll(editorLinkedDescriptors);
+
 		// fallback
 		String leftType= guessType(input.getLeft());
 		String rightType= guessType(input.getRight());
@@ -1075,12 +1084,77 @@ public final class CompareUIPlugin extends AbstractUIPlugin {
 					result.addAll(list);
 			}
 			List<ViewerDescriptor> list = fContentMergeViewers.searchAll(ITypedElement.TEXT_TYPE);
-			if (list != null)
+			if (list != null) {
 				result.addAll(list);
-
-			return result.toArray(new ViewerDescriptor[0]);
+			}
 		}
+
+		ensureTextIsLast(result);
 		return result.isEmpty() ? null : result.toArray(new ViewerDescriptor[0]);
+	}
+
+	/**
+	 * Modifies given set to move "fallback" text descriptor to be the last one.
+	 * This is needed because we want more specific descriptors used first by default.
+	 */
+	private static void ensureTextIsLast(LinkedHashSet<ViewerDescriptor> result) {
+		if (result.size() > 1) {
+			ViewerDescriptor first = result.iterator().next();
+			if (TextMergeViewerCreator.class.getName().equals(first.getViewerClass())) {
+				result.remove(first);
+				result.add(first);
+			}
+		}
+	}
+
+	/**
+	 * @param fileName      possible file name for content in compare editor, may be
+	 *                      null
+	 * @param contentType   possible content type for content in compare editor, may
+	 *                      be null
+	 * @param firstIsEnough stop searching once first match is found
+	 * @return set of descriptors which could be found for given content type via
+	 *         "linked" editor
+	 */
+	Set<ViewerDescriptor> findEditorLinkedDescriptors(String fileName, IContentType contentType,
+			boolean firstIsEnough) {
+		if (fileName == null) {
+			if (contentType == null) {
+				contentType = fgContentTypeManager.findContentTypeFor(fileName);
+			} else {
+				return Collections.emptySet();
+			}
+		}
+
+		LinkedHashSet<ViewerDescriptor> viewers = fContentMergeViewers.getAll().stream()
+				.filter(vd -> vd.getLinkedEditorId() != null).collect(Collectors.toCollection(LinkedHashSet::new));
+		if (viewers.isEmpty()) {
+			return Collections.emptySet();
+		}
+
+		IEditorRegistry editorReg = PlatformUI.getWorkbench().getEditorRegistry();
+		LinkedHashSet<ViewerDescriptor> result = new LinkedHashSet<>();
+		IEditorDescriptor[] editors = editorReg.getEditors(fileName, contentType);
+		for (IEditorDescriptor ed : editors) {
+			addLinkedEditorContentTypes(viewers, firstIsEnough, ed.getId(), result);
+			if (firstIsEnough && !result.isEmpty()) {
+				return result;
+			}
+		}
+		return result;
+	}
+
+	private void addLinkedEditorContentTypes(LinkedHashSet<ViewerDescriptor> viewers, boolean firstIsEnough,
+			String editorId, Set<ViewerDescriptor> result) {
+		Stream<ViewerDescriptor> stream = viewers.stream().filter(vd -> editorId.equals(vd.getLinkedEditorId()));
+		if (firstIsEnough) {
+			Optional<ViewerDescriptor> first = stream.findFirst();
+			if (first.isPresent()) {
+				result.add(first.get());
+			}
+		} else {
+			stream.collect(Collectors.toCollection(() -> result));
+		}
 	}
 
 	/**
@@ -1179,8 +1253,9 @@ public final class CompareUIPlugin extends AbstractUIPlugin {
 			return types[0].equals(types[1]);
 		case 3:
 			return types[0].equals(types[1]) && types[1].equals(types[2]);
+		default:
+			return false;
 		}
-		return false;
 	}
 
 	/*
@@ -1237,8 +1312,9 @@ public final class CompareUIPlugin extends AbstractUIPlugin {
 				result= s0[i];
 			}
 			return result;
+		default:
+			return null;
 		}
-		return null;
 	}
 
 	private static IContentType[] toFullPath(IContentType ct) {
@@ -1487,6 +1563,11 @@ public final class CompareUIPlugin extends AbstractUIPlugin {
 					return type;
 		}
 
+		Set<ViewerDescriptor> editorLinkedDescriptors = findEditorLinkedDescriptors(input.getName(), ctype, true);
+		if (!editorLinkedDescriptors.isEmpty()) {
+			return type;
+		}
+
 		// fallback
 		String leftType= guessType(input.getLeft());
 		String rightType= guessType(input.getRight());
@@ -1511,10 +1592,8 @@ public final class CompareUIPlugin extends AbstractUIPlugin {
 	}
 
 	String findStructureTypeNameOrType(ICompareInput input, ViewerDescriptor vd, CompareConfiguration cc) {
-		if (input == null)
-			return null;
 		// We don't show the structure of additions or deletions
-		if (input == null || input.getLeft() == null || input.getRight() == null)
+		if ((input == null) || input == null || input.getLeft() == null || input.getRight() == null)
 			return null;
 
 		// Content type search

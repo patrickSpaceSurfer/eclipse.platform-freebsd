@@ -21,7 +21,6 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestResult;
 import junit.framework.TestSuite;
-import org.eclipse.core.runtime.Assert;
 import org.eclipse.core.tests.session.SetupManager.SetupException;
 
 public class SessionTestSuite extends TestSuite {
@@ -29,12 +28,9 @@ public class SessionTestSuite extends TestSuite {
 	public static final String UI_TEST_APPLICATION = "org.eclipse.pde.junit.runtime.uitestapplication"; //$NON-NLS-1$
 	protected String applicationId = CORE_TEST_APPLICATION;
 	private final Set<TestCase> crashTests = new HashSet<>();
-	private final Set<TestCase> localTests = new HashSet<>();
 	// the id for the plug-in whose classloader ought to be used to load the test case class
 	protected String pluginId;
 	private Setup setup;
-	// true if test cases should run in the same (shared) session
-	private boolean sharedSession;
 	protected SessionTestRunner testRunner;
 
 	public SessionTestSuite(String pluginId) {
@@ -62,14 +58,6 @@ public class SessionTestSuite extends TestSuite {
 	 */
 	public void addCrashTest(TestCase test) {
 		crashTests.add(test);
-		super.addTest(test);
-	}
-
-	/**
-	 * Adds a local test, a test that is run locally, not in a separate session.
-	 */
-	public void addLocalTest(TestCase test) {
-		localTests.add(test);
 		super.addTest(test);
 	}
 
@@ -119,48 +107,10 @@ public class SessionTestSuite extends TestSuite {
 		return allTests;
 	}
 
-	private boolean isLocalTest(Test test) {
-		return localTests.contains(test);
-	}
-
-	public boolean isSharedSession() {
-		return sharedSession;
-	}
-
 	protected Setup newSetup() throws SetupException {
 		Setup base =  SetupManager.getInstance().getDefaultSetup();
 		base.setSystemProperty("org.eclipse.update.reconcile", "false"); //$NON-NLS-1$ //$NON-NLS-2$
 		return base;
-	}
-
-	/**
-	 * Runs this session test suite.
-	 */
-	@Override
-	public void run(TestResult result) {
-		if (!sharedSession) {
-			super.run(result);
-			return;
-		}
-		// running this session test suite in shared mode
-		Enumeration<Test> tests = tests();
-		Assert.isTrue(tests.hasMoreElements(), "A single test suite must be provided");
-		Test onlyTest = tests.nextElement();
-		Assert.isTrue(!tests.hasMoreElements(), "Only a single test suite can be run");
-		Assert.isTrue(onlyTest instanceof TestSuite, "Only test suites can be run in shared session mode");
-		TestSuite nested = (TestSuite) onlyTest;
-		try {
-			// in shared mode no TestDescriptors are used, need to set up environment ourselves
-			Setup localSetup = (Setup) getSetup().clone();
-			localSetup.setEclipseArgument(Setup.APPLICATION, applicationId);
-			localSetup.setEclipseArgument("testpluginname", pluginId);
-			localSetup.setEclipseArgument("classname", (nested.getName() != null ? nested.getName() : nested.getClass().getName()));
-			// run the session tests
-			new SessionTestRunner().run(this, result, localSetup, false);
-		} catch (SetupException e) {
-			result.addError(this, e.getCause());
-			return;
-		}
 	}
 
 	protected void runSessionTest(TestDescriptor test, TestResult result) {
@@ -175,20 +125,10 @@ public class SessionTestSuite extends TestSuite {
 
 	@Override
 	public final void runTest(Test test, TestResult result) {
-		if (sharedSession) {
-			// just for safety, prevent anybody from calling this API - we don't run individual tests when in shared mode
-			throw new UnsupportedOperationException();
-		}
-
 		if (test instanceof TestDescriptor) {
 			runSessionTest((TestDescriptor) test, result);
 		} else if (test instanceof TestCase) {
-			if (isLocalTest(test)) {
-				// local, ordinary test - just run it
-				test.run(result);
-			} else {
-				runSessionTest(new TestDescriptor((TestCase) test), result);
-			}
+			runSessionTest(new TestDescriptor((TestCase) test), result);
 		} else if (test instanceof TestSuite) {
 			// find and run the test cases that make up the suite
 			runTestSuite((TestSuite) test, result);
@@ -220,7 +160,4 @@ public class SessionTestSuite extends TestSuite {
 		this.setup = setup;
 	}
 
-	public void setSharedSession(boolean sharedSession) {
-		this.sharedSession = sharedSession;
-	}
 }

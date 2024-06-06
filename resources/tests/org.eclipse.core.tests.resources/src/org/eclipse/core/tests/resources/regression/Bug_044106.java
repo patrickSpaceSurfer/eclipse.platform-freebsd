@@ -13,15 +13,27 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.regression;
 
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.assertDoesNotExistInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.assertExistsInFileSystem;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.assertExistsInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInFileSystem;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createUniqueString;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
+
 import java.io.IOException;
 import org.eclipse.core.filesystem.IFileStore;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
-import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.Platform.OS;
-import org.eclipse.core.tests.resources.ResourceTest;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Rule;
+import org.junit.Test;
 
 /**
  * Tests regression of bug 44106. In this case deleting a file which was a
@@ -31,57 +43,46 @@ import org.eclipse.core.tests.resources.ResourceTest;
  * Also tests bug 174492, which is a similar bug except the KEEP_HISTORY
  * flag is used when the resource is deleted from the workspace.
  */
-public class Bug_044106 extends ResourceTest {
+public class Bug_044106 {
 
-	private void createSymLink(String target, String local) {
-		try {
-			Process p = Runtime.getRuntime().exec(new String[] { "/bin/ln", "-s", target, local });
-			p.waitFor();
-		} catch (IOException e) {
-			fail("1.0", e);
-		} catch (InterruptedException e) {
-			fail("1.1", e);
-		}
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
+
+	private void createSymLink(String target, String local) throws InterruptedException, IOException {
+		Process p = Runtime.getRuntime().exec(new String[] { "/bin/ln", "-s", target, local });
+		p.waitFor();
 	}
 
 	/**
 	 * Tests various permutations of the bug.
 	 * @param deleteFlags The option flags to use when deleting the resource.
 	 */
-	public void doTestDeleteLinkedFile(int deleteFlags) {
+	private void doTestDeleteLinkedFile(int deleteFlags) throws Exception {
 		// create the file/folder that we are going to link to
-		IFileStore linkDestFile = getTempStore();
-		createFileInFileSystem(linkDestFile);
+		IFileStore linkDestFile = workspaceRule.getTempStore();
+		createInFileSystem(linkDestFile);
 		assertTrue("0.1", linkDestFile.fetchInfo().exists());
 
 		// create some resources in the workspace
-		IProject project = getWorkspace().getRoot().getProject(getUniqueString());
-		ensureExistsInWorkspace(project, true);
+		IProject project = getWorkspace().getRoot().getProject(createUniqueString());
+		createInWorkspace(project);
 
 		// link in the folder
 		String target = new java.io.File(linkDestFile.toURI()).getAbsolutePath();
 		IFile linkedFile = project.getFile("linkedFile");
 		String local = linkedFile.getLocation().toOSString();
 		createSymLink(target, local);
-		assertExistsInFileSystem("1.2", linkedFile);
+		assertExistsInFileSystem(linkedFile);
 
 		// do a refresh and ensure that the resources are in the workspace
-		try {
-			project.refreshLocal(IResource.DEPTH_INFINITE, getMonitor());
-		} catch (CoreException e) {
-			fail("2.0", e);
-		}
-		assertExistsInWorkspace("2.1", linkedFile);
+		project.refreshLocal(IResource.DEPTH_INFINITE, createTestMonitor());
+		assertExistsInWorkspace(linkedFile);
 
 		// delete the file
-		try {
-			linkedFile.delete(deleteFlags, getMonitor());
-		} catch (CoreException e) {
-			fail("3.0", e);
-		}
+		linkedFile.delete(deleteFlags, createTestMonitor());
 
 		// ensure that the folder and file weren't deleted in the filesystem
-		assertDoesNotExistInWorkspace("4.0", linkedFile);
+		assertDoesNotExistInWorkspace(linkedFile);
 		assertTrue("4.1", linkDestFile.fetchInfo().exists());
 	}
 
@@ -91,110 +92,102 @@ public class Bug_044106 extends ResourceTest {
 	 * is deleted
 	 * @param deleteFlags The flags to use on the resource deletion call
 	 */
-	public void doTestDeleteLinkedFolder(IFolder linkedFolder, boolean deleteParent, int deleteFlags) {
-		if (!OS.isLinux()) {
-			return;
-		}
-		IFileStore linkDestLocation = getTempStore();
-		IFileStore linkDestFile = linkDestLocation.getChild(getUniqueString());
-		createFileInFileSystem(linkDestFile);
+	private void doTestDeleteLinkedFolder(IFolder linkedFolder, boolean deleteParent, int deleteFlags)
+			throws Exception {
+		assumeTrue("only relevant on Linux", OS.isLinux());
+
+		IFileStore linkDestLocation = workspaceRule.getTempStore();
+		IFileStore linkDestFile = linkDestLocation.getChild(createUniqueString());
+		createInFileSystem(linkDestFile);
 		assertTrue("0.1", linkDestLocation.fetchInfo().exists());
 		assertTrue("0.2", linkDestFile.fetchInfo().exists());
 
 		// create some resources in the workspace
-		ensureExistsInWorkspace(linkedFolder.getParent(), true);
+		createInWorkspace(linkedFolder.getParent());
 
 		// link in the folder
 		String target = new java.io.File(linkDestLocation.toURI()).getAbsolutePath();
 		IFile linkedFile = linkedFolder.getFile(linkDestFile.getName());
 		String local = linkedFolder.getLocation().toOSString();
 		createSymLink(target, local);
-		assertExistsInFileSystem("1.2", linkedFolder);
-		assertExistsInFileSystem("1.3", linkedFile);
+		assertExistsInFileSystem(linkedFolder);
+		assertExistsInFileSystem(linkedFile);
 
 		// do a refresh and ensure that the resources are in the workspace
-		try {
-			linkedFolder.getProject().refreshLocal(IResource.DEPTH_INFINITE, getMonitor());
-		} catch (CoreException e) {
-			fail("2.0", e);
-		}
-		assertExistsInWorkspace("2.1", linkedFolder);
-		assertExistsInWorkspace("2.2", linkedFile);
+		linkedFolder.getProject().refreshLocal(IResource.DEPTH_INFINITE, createTestMonitor());
+		assertExistsInWorkspace(linkedFolder);
+		assertExistsInWorkspace(linkedFile);
 
 		// delete the folder or project
-		try {
-			if (deleteParent) {
-				linkedFolder.getParent().delete(deleteFlags, getMonitor());
-			} else {
-				linkedFolder.delete(deleteFlags, getMonitor());
-			}
-		} catch (CoreException e) {
-			fail("3.0", e);
+		if (deleteParent) {
+			linkedFolder.getParent().delete(deleteFlags, createTestMonitor());
+		} else {
+			linkedFolder.delete(deleteFlags, createTestMonitor());
 		}
 
 		// ensure that the folder and file weren't deleted in the filesystem
-		assertDoesNotExistInWorkspace("4.0", linkedFolder);
-		assertDoesNotExistInWorkspace("4.1", linkedFile);
+		assertDoesNotExistInWorkspace(linkedFolder);
+		assertDoesNotExistInWorkspace(linkedFile);
 		assertTrue("4.2", linkDestLocation.fetchInfo().exists());
 		assertTrue("4.3", linkDestFile.fetchInfo().exists());
 	}
 
-	public void testDeleteLinkedFile() {
-		if (!OS.isLinux()) {
-			return;
-		}
+	@Test
+	public void testDeleteLinkedFile() throws Exception {
+		assumeTrue("only relevant on Linux", OS.isLinux());
+
 		doTestDeleteLinkedFile(IResource.NONE);
 	}
 
-	public void testDeleteLinkedFolder() {
-		if (!OS.isLinux()) {
-			return;
-		}
-		IProject project = getWorkspace().getRoot().getProject(getUniqueString());
+	@Test
+	public void testDeleteLinkedFolder() throws Exception {
+		assumeTrue("only relevant on Linux", OS.isLinux());
+
+		IProject project = getWorkspace().getRoot().getProject(createUniqueString());
 		IFolder linkedFolder = project.getFolder("linkedFolder");
 		doTestDeleteLinkedFolder(linkedFolder, false, IResource.NONE);
 	}
 
-	public void testDeleteLinkedResourceInProject() {
-		if (!OS.isLinux()) {
-			return;
-		}
-		IProject project = getWorkspace().getRoot().getProject(getUniqueString());
+	@Test
+	public void testDeleteLinkedResourceInProject() throws Exception {
+		assumeTrue("only relevant on Linux", OS.isLinux());
+
+		IProject project = getWorkspace().getRoot().getProject(createUniqueString());
 		IFolder linkedFolder = project.getFolder("linkedFolder");
 		doTestDeleteLinkedFolder(linkedFolder, true, IResource.NONE);
 	}
 
-	public void testDeleteLinkedFileKeepHistory() {
-		if (!OS.isLinux()) {
-			return;
-		}
+	@Test
+	public void testDeleteLinkedFileKeepHistory() throws Exception {
+		assumeTrue("only relevant on Linux", OS.isLinux());
+
 		doTestDeleteLinkedFile(IResource.KEEP_HISTORY);
 	}
 
-	public void testDeleteLinkedFolderParentKeepHistory() {
-		if (!OS.isLinux()) {
-			return;
-		}
-		IProject project = getWorkspace().getRoot().getProject(getUniqueString());
+	@Test
+	public void testDeleteLinkedFolderParentKeepHistory() throws Exception {
+		assumeTrue("only relevant on Linux", OS.isLinux());
+
+		IProject project = getWorkspace().getRoot().getProject(createUniqueString());
 		IFolder parent = project.getFolder("parent");
 		IFolder linkedFolder = parent.getFolder("linkedFolder");
 		doTestDeleteLinkedFolder(linkedFolder, true, IResource.KEEP_HISTORY);
 	}
 
-	public void testDeleteLinkedFolderKeepHistory() {
-		if (!OS.isLinux()) {
-			return;
-		}
-		IProject project = getWorkspace().getRoot().getProject(getUniqueString());
+	@Test
+	public void testDeleteLinkedFolderKeepHistory() throws Exception {
+		assumeTrue("only relevant on Linux", OS.isLinux());
+
+		IProject project = getWorkspace().getRoot().getProject(createUniqueString());
 		IFolder linkedFolder = project.getFolder("linkedFolder");
 		doTestDeleteLinkedFolder(linkedFolder, false, IResource.KEEP_HISTORY);
 	}
 
-	public void testDeleteLinkedResourceInProjectKeepHistory() {
-		if (!OS.isLinux()) {
-			return;
-		}
-		IProject project = getWorkspace().getRoot().getProject(getUniqueString());
+	@Test
+	public void testDeleteLinkedResourceInProjectKeepHistory() throws Exception {
+		assumeTrue("only relevant on Linux", OS.isLinux());
+
+		IProject project = getWorkspace().getRoot().getProject(createUniqueString());
 		IFolder linkedFolder = project.getFolder("linkedFolder");
 		doTestDeleteLinkedFolder(linkedFolder, true, IResource.KEEP_HISTORY);
 	}

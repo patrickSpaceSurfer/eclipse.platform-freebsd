@@ -1938,15 +1938,10 @@ public class Workspace extends PlatformObject implements IWorkspace, ICoreConsta
 	 */
 	private void initializePreferenceLookupOrder() throws CoreException {
 		PreferencesService service = PreferencesService.getDefault();
-		String[] original = service.getDefaultDefaultLookupOrder();
-		List<String> newOrder = new ArrayList<>();
 		// put the project scope first on the list
-		newOrder.add(ProjectScope.SCOPE);
-		newOrder.addAll(Arrays.asList(original));
-		service.setDefaultDefaultLookupOrder(newOrder.toArray(new String[newOrder.size()]));
+		service.prependScopeToDefaultDefaultLookupOrder(ProjectScope.SCOPE);
 		Preferences node = service.getRootNode().node(ProjectScope.SCOPE);
-		if (node instanceof ProjectPreferences) {
-			ProjectPreferences projectPreferences = (ProjectPreferences) node;
+		if (node instanceof ProjectPreferences projectPreferences) {
 			projectPreferences.setWorkspace(this);
 		} else {
 			throw new CoreException(Status.error(MessageFormat.format(
@@ -2387,11 +2382,14 @@ public class Workspace extends PlatformObject implements IWorkspace, ICoreConsta
 	}
 
 	/**
-	 * Called before checking the pre-conditions of an operation.  Optionally supply
-	 * a scheduling rule to determine when the operation is safe to run.  If a scheduling
-	 * rule is supplied, this method will block until it is safe to run.
+	 * Called before checking the pre-conditions of an operation. Optionally supply
+	 * a scheduling rule to determine when the operation is safe to run. If a
+	 * scheduling rule is supplied, this method will block until it is safe to run.
+	 * Even if no scheduling is supplied this method blocks until no other workspace
+	 * operation concurrently runs.
 	 *
-	 * @param rule the scheduling rule that describes what this operation intends to modify.
+	 * @param rule the scheduling rule that describes what this operation intends to
+	 *             modify.
 	 */
 	public void prepareOperation(ISchedulingRule rule, IProgressMonitor monitor) throws CoreException {
 		try {

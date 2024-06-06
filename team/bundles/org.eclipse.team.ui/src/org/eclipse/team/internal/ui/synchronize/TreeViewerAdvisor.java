@@ -59,7 +59,7 @@ import org.eclipse.ui.part.ResourceTransfer;
  * By default this advisor supports hierarchical models and honour the compressed
  * folder Team preference for showing the sync set as compressed folders. Subclasses
  * can provide their own presentation models.
- * <p>
+ * </p>
  * @since 3.0
  */
 public class TreeViewerAdvisor extends AbstractTreeViewerAdvisor {
@@ -133,9 +133,6 @@ public class TreeViewerAdvisor extends AbstractTreeViewerAdvisor {
 	 * Create an advisor that will allow viewer contributions with the given <code>targetID</code>. This
 	 * advisor will provide a presentation model based on the given sync info set. Note that it's important
 	 * to call {@link #dispose()} when finished with an advisor.
-	 *
-	 * @param parent
-	 * @param configuration
 	 */
 	public TreeViewerAdvisor(Composite parent, ISynchronizePageConfiguration configuration) {
 		super(configuration);
@@ -163,7 +160,6 @@ public class TreeViewerAdvisor extends AbstractTreeViewerAdvisor {
 
 	/**
 	 * Create the model manager to be used by this advisor
-	 * @param configuration
 	 */
 	protected SynchronizeModelManager createModelManager(ISynchronizePageConfiguration configuration) {
 		ISynchronizeParticipant participant = configuration.getParticipant();
@@ -228,8 +224,6 @@ public class TreeViewerAdvisor extends AbstractTreeViewerAdvisor {
 	/**
 	 * Called to set the input to a viewer. The input to a viewer is always the model created
 	 * by the model provider.
-	 *
-	 * @param modelProvider
 	 */
 	public final void setInput(final ISynchronizeModelProvider modelProvider) {
 		final ISynchronizeModelElement modelRoot = modelProvider.getModelRoot();

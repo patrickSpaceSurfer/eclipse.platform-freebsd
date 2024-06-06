@@ -15,6 +15,7 @@
 package org.eclipse.help.internal.webapp.servlet;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -74,9 +75,6 @@ public class AboutServlet extends HttpServlet {
 	public AboutServlet() {
 	}
 
-	/**
-	 *
-	 */
 	private static final long serialVersionUID = -1426745453574711075L;
 	private static final String XHTML_1 = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n<title>"; //$NON-NLS-1$
 	private static final String XHTML_2 = "</title>\n <style type = \"text/css\"> td { padding-right : 10px; }</style></head>\n<body>\n"; //$NON-NLS-1$
@@ -143,7 +141,9 @@ public class AboutServlet extends HttpServlet {
 		buf.append("</table>"); //$NON-NLS-1$
 		buf.append(XHTML_3);
 		String response = buf.toString();
-		resp.getWriter().write(response);
+		@SuppressWarnings("resource")
+		PrintWriter writer = resp.getWriter();
+		writer.write(response);
 	}
 
 	private void getPreferences(HttpServletResponse resp) throws IOException {
@@ -159,7 +159,9 @@ public class AboutServlet extends HttpServlet {
 		writer.writePreferences();
 		buf.append(XHTML_3);
 		String response = buf.toString();
-		resp.getWriter().write(response);
+		@SuppressWarnings("resource")
+		PrintWriter w = resp.getWriter();
+		w.write(response);
 	}
 
 	private void getAgent(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -175,7 +177,9 @@ public class AboutServlet extends HttpServlet {
 		buf.append(UrlUtil.htmlEncode(agent));
 		buf.append(XHTML_3);
 		String response = buf.toString();
-		resp.getWriter().write(response);
+		@SuppressWarnings("resource")
+		PrintWriter writer = resp.getWriter();
+		writer.write(response);
 	}
 
 	private String headerRowFor(PluginDetails details) {

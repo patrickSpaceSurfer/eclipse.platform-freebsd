@@ -24,22 +24,18 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import junit.framework.TestCase;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.IJobChangeEvent;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.core.runtime.jobs.JobChangeAdapter;
-import org.junit.FixMethodOrder;
-import org.junit.Test;
-import org.junit.runners.MethodSorters;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test for bug https://github.com/eclipse-platform/eclipse.platform/issues/193
  */
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
-public class GithubBug_193 extends TestCase {
+public class GithubBug_193 {
 
 	final static Object JOB_FAMILY1 = " family 1";
 	final static Object JOB_FAMILY2 = " family 2";
@@ -49,8 +45,6 @@ public class GithubBug_193 extends TestCase {
 	 * This test relies on proper job event order reported to job listeners to
 	 * succeed. Listener expects that for any job, "scheduled" event is always sent
 	 * before "done". If that is not the case, test will fail.
-	 *
-	 * @throws Exception
 	 */
 	@Test
 	public void testDoneEventReceivedBeforeSchedule() throws Exception {

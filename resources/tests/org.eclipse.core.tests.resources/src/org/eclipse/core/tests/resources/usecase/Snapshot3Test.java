@@ -13,6 +13,14 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.usecase;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.assertExistsInFileSystem;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.assertExistsInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.buildResources;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectDescription;
 import org.eclipse.core.resources.IResource;
@@ -22,7 +30,7 @@ import org.eclipse.core.runtime.CoreException;
  * This session only performs a full save. The workspace should stay
  * the same.
  */
-public class Snapshot3Test extends SnapshotTest {
+public class Snapshot3Test {
 
 	protected static String[] defineHierarchy1() {
 		return Snapshot2Test.defineHierarchy1();
@@ -38,26 +46,26 @@ public class Snapshot3Test extends SnapshotTest {
 
 	public void testVerifyPreviousSession() throws CoreException {
 		// MyProject
-		IProject project = getWorkspace().getRoot().getProject(PROJECT_1);
-		assertTrue("0.0", project.exists());
-		assertTrue("0.1", project.isOpen());
+		IProject project = getWorkspace().getRoot().getProject(SnapshotTest.PROJECT_1);
+		assertTrue(project.exists());
+		assertTrue(project.isOpen());
 
 		// verify existence of children
 		IResource[] resources = buildResources(project, Snapshot2Test.defineHierarchy1());
-		assertExistsInFileSystem("2.1", resources);
-		assertExistsInWorkspace("2.2", resources);
+		assertExistsInFileSystem(resources);
+		assertExistsInWorkspace(resources);
 
 		// Project2
-		project = getWorkspace().getRoot().getProject(PROJECT_2);
-		assertTrue("3.0", project.exists());
-		assertTrue("3.1", project.isOpen());
+		project = getWorkspace().getRoot().getProject(SnapshotTest.PROJECT_2);
+		assertTrue(project.exists());
+		assertTrue(project.isOpen());
 
-		assertEquals("4.0", 4, project.members().length);
-		assertNotNull("4.1", project.findMember(IProjectDescription.DESCRIPTION_FILE_NAME));
+		assertThat(project.members()).hasSize(4);
+		assertNotNull(project.findMember(IProjectDescription.DESCRIPTION_FILE_NAME));
 
 		// verify existence of children
 		resources = buildResources(project, Snapshot2Test.defineHierarchy2());
-		assertExistsInFileSystem("5.1", resources);
-		assertExistsInWorkspace("5.2", resources);
+		assertExistsInFileSystem(resources);
+		assertExistsInWorkspace(resources);
 	}
 }

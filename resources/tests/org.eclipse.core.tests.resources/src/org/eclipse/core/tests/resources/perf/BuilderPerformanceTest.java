@@ -14,12 +14,21 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.perf;
 
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+
 import java.util.Map;
-import org.eclipse.core.resources.*;
+import org.eclipse.core.resources.ICommand;
+import org.eclipse.core.resources.IFolder;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IProjectDescription;
+import org.eclipse.core.resources.IWorkspaceRunnable;
+import org.eclipse.core.resources.IncrementalProjectBuilder;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.tests.harness.PerformanceTestRunner;
 import org.eclipse.core.tests.internal.builders.SortBuilder;
 import org.eclipse.core.tests.internal.builders.TestBuilder;
+import org.junit.Before;
 
 /**
  * Automated performance tests for builders.
@@ -33,18 +42,17 @@ public class BuilderPerformanceTest extends WorkspacePerformanceTest {
 	/**
 	 * Creates a project and fills it with contents
 	 */
-	void createAndPopulateProject(final IProject project, final IFolder folder, final int totalResources) {
-		try {
-			getWorkspace().run((IWorkspaceRunnable) monitor -> {
-				IProjectDescription desc = project.getWorkspace().newProjectDescription(project.getName());
-				desc.setBuildSpec(new ICommand[] {createCommand(desc, "Builder1"), createCommand(desc, "Builder2"), createCommand(desc, "Builder3"), createCommand(desc, "Builder4"), createCommand(desc, "Builder5")});
-				project.create(desc, getMonitor());
-				project.open(getMonitor());
-				createFolder(folder, totalResources);
-			}, getMonitor());
-		} catch (CoreException e) {
-			fail("Failed to create project in performance test", e);
-		}
+	void createAndPopulateProject(final IProject project, final IFolder folder, final int totalResources)
+			throws CoreException {
+		getWorkspace().run((IWorkspaceRunnable) monitor -> {
+			IProjectDescription desc = project.getWorkspace().newProjectDescription(project.getName());
+			desc.setBuildSpec(new ICommand[] { createCommand(desc, "Builder1"), createCommand(desc, "Builder2"),
+					createCommand(desc, "Builder3"), createCommand(desc, "Builder4"),
+					createCommand(desc, "Builder5") });
+			project.create(desc, createTestMonitor());
+			project.open(createTestMonitor());
+			createFolder(folder, totalResources);
+		}, createTestMonitor());
 	}
 
 	/**
@@ -69,7 +77,8 @@ public class BuilderPerformanceTest extends WorkspacePerformanceTest {
 	}
 
 	@Override
-	protected void setUp() throws Exception {
+	@Before
+	public void setUp() throws Exception {
 		super.setUp();
 		otherProjects = new IProject[PROJECT_COUNT];
 		for (int i = 0; i < otherProjects.length; i++) {
@@ -83,7 +92,7 @@ public class BuilderPerformanceTest extends WorkspacePerformanceTest {
 	 * Tests performing manual project-level increment builds when autobuild is on.
 	 * See bug 261225 for details.
 	 */
-	public void testManualBuildWithAutobuildOn() {
+	public void testManualBuildWithAutobuildOn() throws Exception {
 		PerformanceTestRunner runner = new PerformanceTestRunner() {
 			IProject[] projects;
 
@@ -98,20 +107,16 @@ public class BuilderPerformanceTest extends WorkspacePerformanceTest {
 			}
 
 			@Override
-			protected void test() {
-				try {
-					for (int repeats = 0; repeats < REPEAT; repeats++) {
-						for (IProject project : projects) {
-							project.build(IncrementalProjectBuilder.INCREMENTAL_BUILD, getMonitor());
-						}
+			protected void test() throws CoreException {
+				for (int repeats = 0; repeats < REPEAT; repeats++) {
+					for (IProject project : projects) {
+						project.build(IncrementalProjectBuilder.INCREMENTAL_BUILD, createTestMonitor());
 					}
-				} catch (CoreException e) {
-					fail("1.99", e);
 				}
 			}
 		};
 		//this test simulates a manual build before launch with autobuild enabled
 		runner.setFingerprintName("Build workspace before launch");
-		runner.run(this, REPEATS, 1);
+		runner.run(getClass(), testName.getMethodName(), REPEATS, 1);
 	}
 }

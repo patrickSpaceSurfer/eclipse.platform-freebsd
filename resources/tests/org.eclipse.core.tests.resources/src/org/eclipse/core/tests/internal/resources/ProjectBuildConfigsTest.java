@@ -13,17 +13,28 @@
  *******************************************************************************/
 package org.eclipse.core.tests.internal.resources;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+
 import org.eclipse.core.internal.resources.BuildConfiguration;
 import org.eclipse.core.resources.IBuildConfiguration;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectDescription;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.tests.resources.ResourceTest;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 
 /**
  * Tests configuration project build configuration on the project description
  */
-public class ProjectBuildConfigsTest extends ResourceTest {
+public class ProjectBuildConfigsTest {
+
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
 
 	private IProject project;
 	private static final String variantId0 = "Variant0";
@@ -34,108 +45,116 @@ public class ProjectBuildConfigsTest extends ResourceTest {
 	private IBuildConfiguration variant2;
 	private IBuildConfiguration defaultVariant;
 
-	@Override
+	@Before
 	public void setUp() throws Exception {
-		super.setUp();
 		project = getWorkspace().getRoot().getProject("ProjectBuildConfigsTest_Project");
-		ensureExistsInWorkspace(new IProject[] {project}, true);
+		createInWorkspace(new IProject[] {project});
 		variant0 = new BuildConfiguration(project, variantId0);
 		variant1 = new BuildConfiguration(project, variantId1);
 		variant2 = new BuildConfiguration(project, variantId2);
 		defaultVariant = new BuildConfiguration(project, IBuildConfiguration.DEFAULT_CONFIG_NAME);
 	}
 
+	@Test
 	public void testBasics() throws CoreException {
 		IProjectDescription desc = project.getDescription();
 		String[] configs = new String[] {variantId0, variantId1};
 		desc.setBuildConfigs(configs);
-		project.setDescription(desc, getMonitor());
+		project.setDescription(desc, createTestMonitor());
 
-		assertEquals("1.0", new IBuildConfiguration[] {variant0, variant1}, project.getBuildConfigs());
-		assertEquals("1.1", variant0, project.getBuildConfig(variantId0));
-		assertEquals("1.2", variant1, project.getBuildConfig(variantId1));
+		assertThat(project.getBuildConfigs()).containsExactly(variant0, variant1);
+		assertThat(project.getBuildConfig(variantId0)).isEqualTo(variant0);
+		assertThat(project.getBuildConfig(variantId1)).isEqualTo(variant1);
 
 		// Build configuration names don't contribute to equality
-		assertTrue("2.0", project.hasBuildConfig(variant0.getName()));
-		assertTrue("2.1", project.hasBuildConfig(variant1.getName()));
-		assertFalse("2.2", project.hasBuildConfig(variant2.getName()));
+		assertThat(project.hasBuildConfig(variant0.getName()))
+				.withFailMessage("project '%s' is missing build config: %s", project, variant0).isTrue();
+		assertThat(project.hasBuildConfig(variant1.getName()))
+				.withFailMessage("project '%s' is missing build config: %s", project, variant1).isTrue();
+		assertThat(project.hasBuildConfig(variant2.getName()))
+				.withFailMessage("project '%s' unexpectedly has build config: %s", project, variant2).isFalse();
 
-		assertEquals("3.0", variant0, project.getActiveBuildConfig());
+		assertThat(project.getActiveBuildConfig()).isEqualTo(variant0);
 		desc = project.getDescription();
 		desc.setActiveBuildConfig(variantId1);
-		project.setDescription(desc, getMonitor());
-		assertEquals("3.1", variant1, project.getActiveBuildConfig());
+		project.setDescription(desc, createTestMonitor());
+		assertThat(project.getActiveBuildConfig()).isEqualTo(variant1);
 		// test that setting the variant to an invalid id has no effect
 		desc.setActiveBuildConfig(variantId2);
-		assertEquals("3.2", variant1, project.getActiveBuildConfig());
+		assertThat(project.getActiveBuildConfig()).isEqualTo(variant1);
 
 		IBuildConfiguration variant = project.getBuildConfigs()[0];
-		assertEquals("4.0", project, variant.getProject());
-		assertEquals("4.1", variantId0, variant.getName());
+		assertThat(variant.getProject()).isEqualTo(project);
+		assertThat(variant.getName()).isEqualTo(variantId0);
 	}
 
+	@Test
 	public void testDuplicates() throws CoreException {
 		IProjectDescription desc = project.getDescription();
 		desc.setBuildConfigs(new String[] {variantId0, variantId1, variantId0});
-		project.setDescription(desc, getMonitor());
-		assertEquals("1.0", new IBuildConfiguration[] {variant0, variant1}, project.getBuildConfigs());
+		project.setDescription(desc, createTestMonitor());
+		assertThat(project.getBuildConfigs()).containsExactly(variant0, variant1);
 	}
 
+	@Test
 	public void testDefaultVariant() throws CoreException {
 		IProjectDescription desc = project.getDescription();
 		desc.setBuildConfigs(new String[] {});
-		project.setDescription(desc, getMonitor());
+		project.setDescription(desc, createTestMonitor());
 
-		assertEquals("1.0", new IBuildConfiguration[] {defaultVariant}, project.getBuildConfigs());
-		assertTrue("1.1", project.hasBuildConfig(defaultVariant.getName()));
+		assertThat(project.getBuildConfigs()).containsExactly(defaultVariant);
+		assertThat(project.hasBuildConfig(defaultVariant.getName()))
+				.withFailMessage("project '%s' is missing build config: %s", project, defaultVariant).isTrue();
 
-		assertEquals("2.0", defaultVariant, project.getActiveBuildConfig());
+		assertThat(project.getActiveBuildConfig()).isEqualTo(defaultVariant);
 		desc = project.getDescription();
 		desc.setActiveBuildConfig(IBuildConfiguration.DEFAULT_CONFIG_NAME);
-		project.setDescription(desc, getMonitor());
-		assertEquals("2.1", defaultVariant, project.getActiveBuildConfig());
+		project.setDescription(desc, createTestMonitor());
+		assertThat(project.getActiveBuildConfig()).isEqualTo(defaultVariant);
 	}
 
+	@Test
 	public void testRemoveActiveVariant() throws CoreException {
 		IProjectDescription desc = project.getDescription();
 		desc.setBuildConfigs(new String[0]);
 		desc.setBuildConfigs(new String[] {variant0.getName(), variant1.getName()});
-		project.setDescription(desc, getMonitor());
-		assertEquals("1.0", variant0, project.getActiveBuildConfig());
+		project.setDescription(desc, createTestMonitor());
+		assertThat(project.getActiveBuildConfig()).isEqualTo(variant0);
 		desc.setBuildConfigs(new String[] {variant0.getName(), variant2.getName()});
-		project.setDescription(desc, getMonitor());
-		assertEquals("2.0", variant0, project.getActiveBuildConfig());
+		project.setDescription(desc, createTestMonitor());
+		assertThat(project.getActiveBuildConfig()).isEqualTo(variant0);
 		desc = project.getDescription();
 		desc.setActiveBuildConfig(variantId2);
-		project.setDescription(desc, getMonitor());
+		project.setDescription(desc, createTestMonitor());
 		desc.setBuildConfigs(new String[] {variant0.getName(), variant1.getName()});
-		project.setDescription(desc, getMonitor());
-		assertEquals("3.0", variant0, project.getActiveBuildConfig());
+		project.setDescription(desc, createTestMonitor());
+		assertThat(project.getActiveBuildConfig()).isEqualTo(variant0);
 	}
 
 	/**
 	 * Tests that build configuration references are correct after moving a project
-	 * @throws CoreException
 	 */
+	@Test
 	public void testProjectMove() throws CoreException {
 		IProjectDescription desc = project.getDescription();
 		IBuildConfiguration[] configs = new IBuildConfiguration[] {variant0, variant1};
 		desc.setBuildConfigs(new String[] {configs[0].getName(), configs[1].getName()});
-		project.setDescription(desc, getMonitor());
+		project.setDescription(desc, createTestMonitor());
 
 		// Move the project. The build configurations should point at the new project
 		String newProjectName = "projectMoved";
 		desc = project.getDescription();
 		desc.setName(newProjectName);
-		project.move(desc, false, getMonitor());
+		project.move(desc, false, createTestMonitor());
 
 		IProject newProject = getWorkspace().getRoot().getProject(newProjectName);
-		assertTrue("1.0", newProject.exists());
+		assertThat(newProject).matches(IProject::exists, "exists");
 
 		IBuildConfiguration[] newConfigs = newProject.getBuildConfigs();
 		for (int i = 0; i < configs.length; i++) {
-			assertEquals("2." + i * 3, newProject, newConfigs[i].getProject());
-			assertEquals("2." + i * 3 + 1, configs[i].getName(), newConfigs[i].getName());
+			assertThat(newConfigs[i].getProject()).as("project at index %s", i).isEqualTo(newProject);
+			assertThat(newConfigs[i].getName()).as("project name at index %s", i).isEqualTo(configs[i].getName());
 		}
 	}
+
 }

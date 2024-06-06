@@ -14,8 +14,7 @@
 
 package org.eclipse.ua.tests.help.util;
 
-import org.junit.Assert;
-
+import static org.junit.jupiter.api.Assertions.fail;
 
 public class ParallelTestSupport {
 
@@ -24,7 +23,6 @@ public class ParallelTestSupport {
 		 * Runs a test case one time
 		 * @return null if the test passes, otherwise a string representing
 		 * the reason for the failure
-		 * @throws Exception
 		 */
 		public String runTest() throws Exception;
 	}
@@ -38,7 +36,7 @@ public class ParallelTestSupport {
 				result = e.getMessage();
 			}
 			if (result != null) {
-				Assert.fail(result);
+				fail(result);
 			}
 		}
 	}
@@ -60,14 +58,14 @@ public class ParallelTestSupport {
 					try {
 						Thread.sleep(100);
 					} catch (InterruptedException e) {
-						Assert.fail("Interrupted Exception");
+						fail("Interrupted Exception");
 					}
 				}
 			}
 		} while (!complete);
 		for (int i = 0; i < numberOfThreads; i++) {
 			if (testThreads[i].failureReason != null) {
-				Assert.fail(testThreads[i].failureReason);
+				fail(testThreads[i].failureReason);
 			}
 		}
 	}

@@ -13,11 +13,20 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.usecase;
 
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.removeFromWorkspace;
+import static org.junit.Assert.assertTrue;
+
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.tests.resources.ResourceTest;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Rule;
+import org.junit.Test;
 
-public class ConcurrencyTest extends ResourceTest {
+public class ConcurrencyTest {
+
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
 
 	protected void assertIsNotRunning(ConcurrentOperation01 op, String label) {
 		/* try more than once, "just in case" */
@@ -35,13 +44,11 @@ public class ConcurrencyTest extends ResourceTest {
 	 * This test is used to find out if two operations can start concurrently. It assumes
 	 * that they cannot.
 	 */
+	@Test
 	public void testConcurrentOperations() throws CoreException {
-
 		IProject project = getWorkspace().getRoot().getProject("MyProject");
 		project.create(null);
 		project.open(null);
-
-		buildResources(project, defineHierarchy());
 
 		ConcurrentOperation01 op1 = new ConcurrentOperation01(getWorkspace());
 		ConcurrentOperation01 op2 = new ConcurrentOperation01(getWorkspace());
@@ -66,6 +73,7 @@ public class ConcurrencyTest extends ResourceTest {
 		assertTrue("2.2", op2.getStatus().isOK());
 
 		/* remove trash */
-		ensureDoesNotExistInWorkspace(getWorkspace().getRoot());
+		removeFromWorkspace(getWorkspace().getRoot());
 	}
+
 }

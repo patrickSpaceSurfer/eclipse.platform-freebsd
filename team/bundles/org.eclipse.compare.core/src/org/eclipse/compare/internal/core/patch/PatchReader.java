@@ -177,13 +177,13 @@ public class PatchReader {
 				diffArgs= line.substring(4).trim();
 			} else if (line.startsWith("--- ")) { //$NON-NLS-1$
 				line= readUnifiedDiff(diffs, lr, line, diffArgs, fileName);
-				if (!headerLines.isEmpty())
+				if (!headerLines.isEmpty() && !diffs.isEmpty())
 					setHeader(diffs.get(diffs.size() - 1), headerLines);
 				diffArgs= fileName= null;
 				reread= true;
 			} else if (line.startsWith("*** ")) { //$NON-NLS-1$
 				line= readContextDiff(diffs, lr, line, diffArgs, fileName);
-				if (!headerLines.isEmpty())
+				if (!headerLines.isEmpty() && !diffs.isEmpty())
 					setHeader(diffs.get(diffs.size() - 1), headerLines);
 				diffArgs= fileName= null;
 				reread= true;
@@ -589,7 +589,7 @@ public class PatchReader {
 				try {
 					Date date = dateFormat.parse(line);
 					return date.getTime();
-				} catch (ParseException ex) {
+				} catch (@SuppressWarnings("unused") ParseException ex) {
 					// silently ignored
 				}
 			}

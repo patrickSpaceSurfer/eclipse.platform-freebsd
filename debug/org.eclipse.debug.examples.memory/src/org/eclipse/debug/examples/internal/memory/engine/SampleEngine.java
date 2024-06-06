@@ -15,11 +15,10 @@
 package org.eclipse.debug.examples.internal.memory.engine;
 
 import java.math.BigInteger;
-import java.util.Enumeration;
-import java.util.Hashtable;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 
-import org.eclipse.core.runtime.CoreException;
 import org.eclipse.debug.core.model.MemoryByte;
 import org.eclipse.debug.examples.internal.memory.core.SampleDebugTarget;
 import org.eclipse.debug.examples.internal.memory.core.SampleMemoryBlock;
@@ -35,26 +34,23 @@ public class SampleEngine {
 
 	Random fRandom = new Random();
 	byte[] fMemory;
-	Hashtable<BigInteger, SampleMemoryUnit> memoryBlockTable;
-	Hashtable<String, BigInteger> expressionAddressTable = new Hashtable<>();
-	Hashtable<SampleDebugTarget, Object> threadTable = new Hashtable<>();
-	Hashtable<SampleThread, Object> stackframeTable = new Hashtable<>();
+	Map<BigInteger, SampleMemoryUnit> memoryBlockTable;
+	Map<String, BigInteger> expressionAddressTable = new HashMap<>();
+	Map<SampleDebugTarget, Object> threadTable = new HashMap<>();
+	Map<SampleThread, Object> stackframeTable = new HashMap<>();
 
 	Random random = new Random();
 
 	/**
 	 * Allow debug adapters to get memory from an address
 	 *
-	 * @param address
-	 * @param length
 	 * @return memory byte from an address
-	 * @throws RuntimeException
 	 */
-	synchronized public MemoryByte[] getBytesFromAddress(BigInteger address, long length) throws RuntimeException {
+	public synchronized MemoryByte[] getBytesFromAddress(BigInteger address, long length) {
 
 		if (memoryBlockTable == null) {
 			// create new memoryBlock table
-			memoryBlockTable = new Hashtable<>();
+			memoryBlockTable = new HashMap<>();
 			byte[] bytes = new byte[(int) length * getAddressableSize()];
 			BigInteger addressKey = address;
 
@@ -131,25 +127,23 @@ public class SampleEngine {
 	 * Convenience function to cause changes in a memoryBlock block. Changes
 	 * could result from running the program, changing a variable, etc.
 	 */
-	synchronized public void changeValue() {
+	public synchronized void changeValue() {
 		if (memoryBlockTable == null) {
 			return;
 		}
 
-		Enumeration<BigInteger> enumeration = memoryBlockTable.keys();
 		long randomChange = random.nextInt(37);
 
 		while (randomChange <= 5) {
 			randomChange = random.nextInt(37);
 		}
 
-		while (enumeration.hasMoreElements()) {
-			BigInteger key = enumeration.nextElement();
+		for (BigInteger key : memoryBlockTable.keySet()) {
 			if (key.remainder(BigInteger.valueOf(randomChange)).equals(BigInteger.ZERO)) {
 				byte[] x = new byte[getAddressableSize()];
 				random.nextBytes(x);
 
-				MemoryByte unitBytes[] = new MemoryByte[getAddressableSize()];
+				MemoryByte[] unitBytes = new MemoryByte[getAddressableSize()];
 				for (int i = 0; i < x.length; i++) {
 					MemoryByte oneByte = new MemoryByte();
 					oneByte.setValue(x[i]);
@@ -186,11 +180,9 @@ public class SampleEngine {
 	 * Simulates evaluation of an expression. Given an expression, return ad
 	 * address
 	 *
-	 * @param expression
-	 * @param evalContext
 	 * @return the address the expression is evaluated to
 	 */
-	public BigInteger evaluateExpression(String expression, Object evalContext) {
+	public BigInteger evaluateExpression(String expression) {
 		BigInteger expAddress = expressionAddressTable.get(expression);
 		if (expAddress == null) {
 			int address = random.nextInt();
@@ -217,12 +209,8 @@ public class SampleEngine {
 
 	/**
 	 * Simulates modifying memory using BigInteger as the address
-	 *
-	 * @param address
-	 * @param bytes
-	 * @throws RuntimeException
 	 */
-	public void setValue(BigInteger address, byte[] bytes) throws RuntimeException {
+	public void setValue(BigInteger address, byte[] bytes) {
 		BigInteger convertedAddress = address;
 
 		for (int i = 0; i < bytes.length; i = i + getAddressableSize()) {
@@ -246,7 +234,6 @@ public class SampleEngine {
 	}
 
 	/**
-	 * @param address
 	 * @return true if the debuggee is big endian, false otherwise
 	 */
 	public boolean isBigEndian(BigInteger address) {
@@ -261,7 +248,6 @@ public class SampleEngine {
 	}
 
 	/**
-	 * @param address
 	 * @return true if the address is writable, false otherwise Read only
 	 *         segment: 0xab123456 to 0xab123556
 	 */
@@ -282,10 +268,6 @@ public class SampleEngine {
 
 	}
 
-	/**
-	 * @param address
-	 * @return
-	 */
 	public boolean isReadable(BigInteger address) {
 		BigInteger boundary = new BigInteger("cd123456", 16); //$NON-NLS-1$
 		BigInteger boundaryEnd = new BigInteger("cd123576", 16); //$NON-NLS-1$
@@ -295,10 +277,6 @@ public class SampleEngine {
 		return true;
 	}
 
-	/**
-	 * @param target
-	 * @return
-	 */
 	public SampleThread[] getThreads(SampleDebugTarget target) {
 		Object thread = threadTable.get(target);
 		if (thread == null) {
@@ -308,10 +286,6 @@ public class SampleEngine {
 		return new SampleThread[] { (SampleThread) thread };
 	}
 
-	/**
-	 * @param thread
-	 * @return
-	 */
 	public SampleStackFrame[] getStackframes(SampleThread thread) {
 		Object stackframes = stackframeTable.get(thread);
 		if (stackframes == null) {
@@ -321,9 +295,6 @@ public class SampleEngine {
 		return (SampleStackFrame[]) stackframes;
 	}
 
-	/**
-	 *
-	 */
 	private SampleStackFrame[] createStackframes(SampleThread thread) {
 		SampleStackFrame[] stackframes = new SampleStackFrame[2];
 		stackframes[0] = new SampleStackFrame(thread, "Frame1"); //$NON-NLS-1$
@@ -332,11 +303,10 @@ public class SampleEngine {
 	}
 
 	/**
-	 * @param mb
 	 * @return true if memory block is to support base address modification,
 	 *         false otherwise
 	 */
-	public boolean suppostsBaseAddressModification(SampleMemoryBlock mb) {
+	public boolean suppostsBaseAddressModification() {
 		return false;
 	}
 
@@ -345,25 +315,22 @@ public class SampleEngine {
 	 *
 	 * @param mb the memory block to change base address
 	 * @param address the new base address of the memory block
-	 * @throws CoreException
 	 */
-	public void setBaseAddress(SampleMemoryBlock mb, BigInteger address) throws CoreException {
+	public void setBaseAddress(SampleMemoryBlock mb, BigInteger address) {
 	}
 
 	/**
-	 * @param mb
 	 * @return true if this memory block supports value modification, false
 	 *         otherwise
 	 */
-	public boolean supportsValueModification(SampleMemoryBlock mb) {
+	public boolean supportsValueModification() {
 		return true;
 	}
 
 	/**
 	 * @return address size of the debuggee
-	 * @throws CoreException
 	 */
-	public int getAddressSize() throws CoreException {
+	public int getAddressSize() {
 		return 4;
 	}
 }

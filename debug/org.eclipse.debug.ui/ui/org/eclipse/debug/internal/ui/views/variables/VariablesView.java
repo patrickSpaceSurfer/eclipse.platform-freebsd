@@ -454,11 +454,7 @@ public class VariablesView extends AbstractDebugView implements IDebugContextLis
 
 		Object current = getViewer().getInput();
 
-		if (current == null && context == null) {
-			return;
-		}
-
-		if (current != null && current.equals(context)) {
+		if ((current == null && context == null) || (current != null && current.equals(context))) {
 			return;
 		}
 
@@ -606,9 +602,10 @@ public class VariablesView extends AbstractDebugView implements IDebugContextLis
 	public void partDeactivated(IWorkbenchPart part) {
 		String id = part.getSite().getId();
 		if (id.equals(getSite().getId())) {
-			try (StringWriter writer = new StringWriter()) {
-				XMLMemento memento = XMLMemento.createWriteRoot("VariablesViewMemento"); //$NON-NLS-1$
-				saveViewerState(memento);
+			StringWriter writer = new StringWriter();
+			XMLMemento memento = XMLMemento.createWriteRoot("VariablesViewMemento"); //$NON-NLS-1$
+			saveViewerState(memento);
+			try {
 				memento.save(writer);
 
 				IPreferenceStore store = DebugUIPlugin.getDefault().getPreferenceStore();
@@ -649,12 +646,12 @@ public class VariablesView extends AbstractDebugView implements IDebugContextLis
 
 		int style = getViewerStyle();
 		fPresentationContext = new DebugModelPresentationContext(getPresentationContextId(), this, fModelPresentation);
-		final TreeModelViewer variablesViewer = new TreeModelViewer(parent, style, fPresentationContext);
-		variablesViewer.getControl().addFocusListener(new FocusAdapter() {
+		final TreeModelViewer v = new TreeModelViewer(parent, style, fPresentationContext);
+		v.getControl().addFocusListener(new FocusAdapter() {
 			@Override
 			public void focusGained(FocusEvent e) {
 				fTreeHasFocus = true;
-				fSelectionProvider.setActiveProvider(variablesViewer);
+				fSelectionProvider.setActiveProvider(v);
 				setGlobalActions();
 			}
 
@@ -668,7 +665,7 @@ public class VariablesView extends AbstractDebugView implements IDebugContextLis
 				getViewSite().getActionBars().updateActionBars();
 			}
 		});
-		variablesViewer.getPresentationContext().addPropertyChangeListener(
+		v.getPresentationContext().addPropertyChangeListener(
 				event -> {
 					if (IPresentationContext.PROPERTY_COLUMNS.equals(event.getProperty())) {
 						IAction action = getAction("ShowTypeNames"); //$NON-NLS-1$
@@ -678,10 +675,10 @@ public class VariablesView extends AbstractDebugView implements IDebugContextLis
 					}
 				});
 
-		variablesViewer.addPostSelectionChangedListener(getTreeSelectionChangedListener());
+		v.addPostSelectionChangedListener(getTreeSelectionChangedListener());
 		DebugUITools.addPartDebugContextListener(getSite(), this);
 
-		return variablesViewer;
+		return v;
 	}
 
 	private void setGlobalActions() {
@@ -1124,19 +1121,11 @@ public class VariablesView extends AbstractDebugView implements IDebugContextLis
 						return;
 					}
 					refreshDetailPaneContents();
-					treeSelectionChanged(event);
 				}
 			};
 		}
 		return fTreeSelectionChangedListener;
 	}
-
-	/**
-	 * Selection in the variable tree changed. Perform any updates.
-	 *
-	 * @param event
-	 */
-	protected void treeSelectionChanged(SelectionChangedEvent event) {}
 
 	@Override
 	public String getCurrentPaneID() {
@@ -1503,7 +1492,6 @@ public class VariablesView extends AbstractDebugView implements IDebugContextLis
 	 *
 	 * @param action the action to store a default value
 	 * @param value the default value for action
-	 *
 	 */
 	void storeDefaultPreference(Action action, Object value) {
 		if (value instanceof Boolean) {

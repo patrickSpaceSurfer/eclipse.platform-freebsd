@@ -13,27 +13,41 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.session;
 
-import junit.framework.Test;
+import static java.util.function.Predicate.not;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.core.tests.resources.ResourceTestPluginConstants.PI_RESOURCES_TESTS;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+
 import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.resources.IWorkspaceDescription;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.tests.resources.AutomatedResourceTests;
-import org.eclipse.core.tests.resources.WorkspaceSessionTest;
-import org.eclipse.core.tests.session.WorkspaceSessionTestSuite;
+import org.eclipse.core.tests.harness.session.SessionTestExtension;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Ensures that the workspace description is correctly persisted across
  * sessions.
  */
-public class WorkspaceDescriptionTest extends WorkspaceSessionTest {
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+public class WorkspaceDescriptionTest {
 	private static final String[] BUILD_ORDER = new String[] {"Foo"};
 	private static final boolean APPLY_POLICY = false;
-	private static final int STATE_LONGEVITY = 123456;
+	private static final long STATE_LONGEVITY = 123456;
 	private static final int MAX_STATES = 244;
 	private static final long MAX_FILE_SIZE = 1024 * 53;
 	private static final long SNAPSHOT_INTERVAL = 4321;
 
+	@RegisterExtension
+	static SessionTestExtension sessionTestExtension = SessionTestExtension.forPlugin(PI_RESOURCES_TESTS)
+			.withCustomization(SessionTestExtension.createCustomWorkspace()).create();
+
+	@Test
+	@Order(1)
 	public void test1() throws CoreException {
 		IWorkspace workspace = ResourcesPlugin.getWorkspace();
 		IWorkspaceDescription desc = workspace.getDescription();
@@ -45,22 +59,23 @@ public class WorkspaceDescriptionTest extends WorkspaceSessionTest {
 		desc.setMaxFileStateSize(MAX_FILE_SIZE);
 		desc.setSnapshotInterval(SNAPSHOT_INTERVAL);
 		workspace.setDescription(desc);
-		workspace.save(true, getMonitor());
+		workspace.save(true, createTestMonitor());
 	}
 
+	@Test
+	@Order(2)
 	public void test2() {
 		IWorkspace workspace = ResourcesPlugin.getWorkspace();
 		IWorkspaceDescription desc = workspace.getDescription();
-		assertTrue("2.0", !desc.isAutoBuilding());
-		assertEquals("2.1", BUILD_ORDER, desc.getBuildOrder());
-		assertEquals("2.2", APPLY_POLICY, desc.isApplyFileStatePolicy());
-		assertEquals("2.3", STATE_LONGEVITY, desc.getFileStateLongevity());
-		assertEquals("2.4", MAX_STATES, desc.getMaxFileStates());
-		assertEquals("2.5", MAX_FILE_SIZE, desc.getMaxFileStateSize());
-		assertEquals("2.6", SNAPSHOT_INTERVAL, desc.getSnapshotInterval());
+		assertThat(desc).matches(not(IWorkspaceDescription::isAutoBuilding), "auto building is disabled");
+		assertThat(desc.getBuildOrder()).as("buildorder in: %s", desc).isEqualTo(BUILD_ORDER);
+		assertThat(desc.isApplyFileStatePolicy()).as("apply file state policy in: %s", desc)
+				.isEqualTo(APPLY_POLICY);
+		assertThat(desc.getFileStateLongevity()).as("longevity in: %s", desc).isEqualTo(STATE_LONGEVITY);
+		assertThat(desc.getMaxFileStates()).as("max states in: %s", desc).isEqualTo(MAX_STATES);
+		assertThat(desc.getMaxFileStateSize()).as("max file size in: %s", desc).isEqualTo(MAX_FILE_SIZE);
+		assertThat(desc.getSnapshotInterval()).as("snapshot interval in: %s", desc)
+				.isEqualTo(SNAPSHOT_INTERVAL);
 	}
 
-	public static Test suite() {
-		return new WorkspaceSessionTestSuite(AutomatedResourceTests.PI_RESOURCES_TESTS, WorkspaceDescriptionTest.class);
-	}
 }

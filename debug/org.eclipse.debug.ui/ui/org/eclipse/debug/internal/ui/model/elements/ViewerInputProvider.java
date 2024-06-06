@@ -17,7 +17,6 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
-import org.eclipse.core.runtime.jobs.ISchedulingRule;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.debug.internal.ui.viewers.model.provisional.IPresentationContext;
 import org.eclipse.debug.internal.ui.viewers.model.provisional.IViewerInputProvider;
@@ -46,7 +45,6 @@ public abstract class ViewerInputProvider implements IViewerInputProvider {
 			}
 		};
 		job.setSystem(true);
-		job.setRule(getRule(update));
 		job.schedule();
 	}
 
@@ -88,7 +86,6 @@ public abstract class ViewerInputProvider implements IViewerInputProvider {
 	/**
 	 * Returns whether this adapter supports the given context.
 	 *
-	 * @param context
 	 * @return whether this adapter supports the given context
 	 */
 	protected boolean supportsContext(IPresentationContext context) {
@@ -102,16 +99,4 @@ public abstract class ViewerInputProvider implements IViewerInputProvider {
 	 * @return whether this adapter provides content in the specified context id
 	 */
 	protected abstract boolean supportsContextId(String id);
-
-	/**
-	 * Returns a scheduling rule to use when performing the given updates or
-	 * <code>null</code> if none.
-	 *
-	 * @param update
-	 * @return scheduling rule or <code>null</code> if none
-	 */
-	protected ISchedulingRule getRule(IViewerInputUpdate update) {
-		return null;
-	}
-
 }

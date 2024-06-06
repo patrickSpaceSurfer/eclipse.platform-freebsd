@@ -14,6 +14,7 @@
 package org.eclipse.core.tests.runtime;
 
 import static java.util.Collections.emptyMap;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -46,11 +47,9 @@ import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.SafeRunner;
 import org.eclipse.osgi.framework.log.FrameworkLog;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestName;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleException;
@@ -66,10 +65,7 @@ public class PlatformTest {
 	private ServiceReference<FrameworkLog> logRef;
 	private java.io.File originalLocation;
 
-	@Rule
-	public final TestName testName = new TestName();
-
-	@Before
+	@BeforeEach
 	public void setUp() throws Exception {
 		//ensure platform locations are initialized
 		Platform.getLogFileLocation();
@@ -80,7 +76,7 @@ public class PlatformTest {
 		originalLocation = logService.getFile();
 	}
 
-	@After
+	@AfterEach
 	public void tearDown() throws Exception {
 		//undo any damage done by log location test
 		logService.setFile(originalLocation, true);
@@ -153,12 +149,7 @@ public class PlatformTest {
 		final List<IStatus> collected = new ArrayList<>();
 
 		// add a log listener to ensure that we report using the right plug-in id
-		ILogListener logListener = new ILogListener() {
-			@Override
-			public void logging(IStatus status, String plugin) {
-				collected.add(status);
-			}
-		};
+		ILogListener logListener = (status, plugin) -> collected.add(status);
 		Platform.addLogListener(logListener);
 
 		final Exception exception = new Exception("PlatformTest.testRunnable: this exception is thrown on purpose as part of the test.");
@@ -200,7 +191,7 @@ public class PlatformTest {
 	 */
 	@Test
 	public void testIsFragment() throws Exception {
-		String bundleName = testName.getMethodName();
+		String bundleName = "testIsFragment";
 		File config = RuntimeTestsPlugin.getContext().getDataFile(bundleName);
 		Files.createDirectories(config.toPath());
 
@@ -253,11 +244,10 @@ public class PlatformTest {
 	 */
 	@Test
 	public void testGetBundle() throws Exception {
-		Map<String, Bundle> bundles = createSimpleTestBundles("1.0.0", "2.0.0");
-		Bundle bundle;
-		String bundleName = testName.getMethodName();
+		String bundleName = "testGetBundle";
+		Map<String, Bundle> bundles = createSimpleTestBundles(bundleName, "1.0.0", "2.0.0");
 
-		bundle = Platform.getBundle(bundleName);
+		Bundle bundle = Platform.getBundle(bundleName);
 		assertNull(bundleName + " bundle just installed, but not started => expect null result", bundle);
 		for (Bundle b : bundles.values()) {
 			b.start();
@@ -319,11 +309,10 @@ public class PlatformTest {
 	 */
 	@Test
 	public void testGetBundles() throws Exception {
-		Map<String, Bundle> bundles = createSimpleTestBundles("1.0.0", "3.0.0", "2.0.0");
-		Bundle bundle;
-		String bundleName = testName.getMethodName();
+		String bundleName = "testGetBundles";
+		Map<String, Bundle> bundles = createSimpleTestBundles(bundleName, "1.0.0", "3.0.0", "2.0.0");
 
-		bundle = Platform.getBundle(bundleName);
+		Bundle bundle = Platform.getBundle(bundleName);
 		assertNull(bundleName + " bundle just installed, but not started => expect null result", bundle);
 		for (Bundle b : bundles.values()) {
 			b.start();
@@ -331,17 +320,17 @@ public class PlatformTest {
 
 		Bundle[] result = Platform.getBundles(bundleName, null); // no version constraint => get all 3
 		assertNotNull(bundleName + " bundle not available", bundles);
-		assertEquals(3, result.length);
+		assertThat(result).hasSize(3);
 		assertEquals(3, result[0].getVersion().getMajor()); // 3.0.0 version first
 		assertEquals(1, result[2].getVersion().getMajor()); // 1.0.0 version last
 
 		result = Platform.getBundles(bundleName, "2.0.0");
-		assertEquals(2, result.length);
+		assertThat(result).hasSize(2);
 		assertEquals(3, result[0].getVersion().getMajor()); // 3.0.0 version first
 		assertEquals(2, result[1].getVersion().getMajor()); // 2.0.0 version last
 
 		result = Platform.getBundles(bundleName, "[1.0.0,2.0.0)");
-		assertEquals(1, result.length);
+		assertThat(result).hasSize(1);
 		assertEquals(1, result[0].getVersion().getMajor()); // 1.0.0 version
 
 		result = Platform.getBundles(bundleName, "[1.1.0,2.0.0)");
@@ -352,11 +341,10 @@ public class PlatformTest {
 	public void testGetSystemBundle() {
 		Bundle expectedSystem = RuntimeTestsPlugin.getContext().getBundle(Constants.SYSTEM_BUNDLE_LOCATION);
 		Bundle actualSystem = Platform.getBundle(Constants.SYSTEM_BUNDLE_SYMBOLICNAME);
-		assertEquals("Wrong system bundle.", expectedSystem, actualSystem);
+		assertThat(actualSystem).as("check system bundle").isEqualTo(expectedSystem);
 
 		Bundle[] actualSystems = Platform.getBundles(Constants.SYSTEM_BUNDLE_SYMBOLICNAME, null);
-		assertEquals("Wrong number of system bundles.", 1, actualSystems.length);
-		assertEquals("Wrong system bundle.", expectedSystem, actualSystems[0]);
+		assertThat(actualSystems).as("check system bundles").containsExactly(expectedSystem);
 	}
 
 	/**
@@ -364,9 +352,9 @@ public class PlatformTest {
 	 * bundles are packaged to jars and installed into the container. The jars are
 	 * marked for deletion on exit.
 	 */
-	private Map<String, Bundle> createSimpleTestBundles(String... versions) throws BundleException, IOException {
+	private Map<String, Bundle> createSimpleTestBundles(String bundleName, String... versions)
+			throws BundleException, IOException {
 		Map<String, Bundle> bundles = new HashMap<>();
-		String bundleName = testName.getMethodName();
 		File config = RuntimeTestsPlugin.getContext().getDataFile(bundleName);
 		Files.createDirectories(config.toPath());
 

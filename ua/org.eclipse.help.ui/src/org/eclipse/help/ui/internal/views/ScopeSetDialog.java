@@ -34,6 +34,7 @@ import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.TableViewer;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerFilter;
+import org.eclipse.jface.window.Window;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionAdapter;
@@ -208,9 +209,6 @@ public class ScopeSetDialog extends TrayDialog  {
 		}
 	}
 
-	/**
-	 * @param parent
-	 */
 	public ScopeSetDialog(Shell parent, ScopeSetManager manager, EngineDescriptorManager descManager, boolean localOnly) {
 		super(parent);
 		this.manager = manager;
@@ -456,7 +454,7 @@ public class ScopeSetDialog extends TrayDialog  {
 		String dialogTitle = isRename ?
 		  Messages.RenameDialog_wtitle : Messages.NewDialog_wtitle;
 		dialog.getShell().setText(dialogTitle);
-		if (dialog.open()==RenameDialog.OK) {
+		if (dialog.open()==Window.OK) {
 			return dialog.getNewName();
 		}
 		return null;
@@ -486,7 +484,7 @@ public class ScopeSetDialog extends TrayDialog  {
 
 	private void updateButtons() {
 		IStructuredSelection ssel = viewer.getStructuredSelection();
-		editButton.setEnabled(ssel.isEmpty()==false);
+		editButton.setEnabled(!ssel.isEmpty());
 		ScopeSet set = (ScopeSet)ssel.getFirstElement();
 		boolean editableSet = set!=null && set.isEditable() && !set.isImplicit();
 		removeButton.setEnabled(editableSet);

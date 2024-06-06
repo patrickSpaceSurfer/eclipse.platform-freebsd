@@ -13,35 +13,60 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.session;
 
-import junit.framework.Test;
-import org.eclipse.core.resources.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestPluginConstants.PI_RESOURCES_TESTS;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createRandomContentsStream;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IFolder;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.tests.resources.AutomatedResourceTests;
-import org.eclipse.core.tests.session.WorkspaceSessionTestSuite;
+import org.eclipse.core.tests.harness.session.SessionTestExtension;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Tests closing a workspace without save.
  */
-public class TestCloseNoSave extends WorkspaceSerializationTest {
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+public class TestCloseNoSave {
+	private static final String PROJECT = "Project";
+	private static final String FOLDER = "Folder";
+	private static final String FILE = "File";
+
+	@RegisterExtension
+	static SessionTestExtension sessionTestExtension = SessionTestExtension.forPlugin(PI_RESOURCES_TESTS)
+			.withCustomization(SessionTestExtension.createCustomWorkspace()).create();
+
+	@Test
+	@Order(1)
 	public void test1() throws CoreException {
 		/* create some resource handles */
-		IProject project = workspace.getRoot().getProject(PROJECT);
-		project.create(getMonitor());
-		project.open(getMonitor());
+		IProject project = getWorkspace().getRoot().getProject(PROJECT);
+		project.create(createTestMonitor());
+		project.open(createTestMonitor());
 		IFolder folder = project.getFolder(FOLDER);
-		folder.create(true, true, getMonitor());
+		folder.create(true, true, createTestMonitor());
 		IFile file = folder.getFile(FILE);
-		file.create(getRandomContents(), true, getMonitor());
+		file.create(createRandomContentsStream(), true, createTestMonitor());
 	}
 
+	@Test
+	@Order(2)
 	public void test2() throws CoreException {
 		// projects should exist immediately due to snapshot - files may or
 		// may not exist due to snapshot timing. All resources should exist after refresh.
-		IResource[] members = workspace.getRoot().members();
-		assertEquals("1.0", 1, members.length);
-		assertTrue("1.1", members[0].getType() == IResource.PROJECT);
+		IResource[] members = getWorkspace().getRoot().members();
+		assertThat(members).hasSize(1).allSatisfy(member -> assertThat(member.getType()).isEqualTo(IResource.PROJECT));
 		IProject project = (IProject) members[0];
-		assertTrue("1.2", project.exists());
+		assertTrue(project.exists());
 		IFolder folder = project.getFolder(FOLDER);
 		IFile file = folder.getFile(FILE);
 
@@ -50,13 +75,9 @@ public class TestCloseNoSave extends WorkspaceSerializationTest {
 			project.open(null);
 		}
 
-		assertEquals("2.0", 3, project.members().length);
-		assertTrue("2.1", folder.exists());
-		assertTrue("2.2", file.exists());
-	}
-
-	public static Test suite() {
-		return new WorkspaceSessionTestSuite(AutomatedResourceTests.PI_RESOURCES_TESTS, TestCloseNoSave.class);
+		assertThat(project.members()).hasSize(3);
+		assertTrue(folder.exists());
+		assertTrue(file.exists());
 	}
 
 }

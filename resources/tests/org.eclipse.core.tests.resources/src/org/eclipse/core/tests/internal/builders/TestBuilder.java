@@ -44,7 +44,8 @@ public abstract class TestBuilder extends IncrementalProjectBuilder {
 		/**
 		 * Fetch the scheduling rule for the build
 		 */
-		public ISchedulingRule getRule(String name, IncrementalProjectBuilder builder, int trigger, Map<String, String> args) {
+		public ISchedulingRule getRule(String name, IncrementalProjectBuilder projectBuilder, int trigger,
+				Map<String, String> args) {
 			return ResourcesPlugin.getWorkspace().getRoot();
 		}
 
@@ -101,8 +102,8 @@ public abstract class TestBuilder extends IncrementalProjectBuilder {
 	 * failure if expectations are not met. If successful, clears the list of
 	 * expected and actual events in preparation for the next test.
 	 */
-	public void assertLifecycleEvents(String text) {
-		Assert.assertEquals(text, expectedEvents, actualEvents);
+	public void assertLifecycleEvents() {
+		Assert.assertEquals(expectedEvents, actualEvents);
 		reset();
 	}
 
@@ -155,27 +156,27 @@ public abstract class TestBuilder extends IncrementalProjectBuilder {
 	/**
 	 * Return the configuration element that created this builder.
 	 *
-	 * @see setInitializationData(IConfigurationElement, String, Object)
+	 * @see #setInitializationData(IConfigurationElement, String, Object)
 	 */
 	public IConfigurationElement getConfigurationElement() {
 		return config;
 	}
 
 	/**
-	 * Return the data, always a <code>Hashtable</code> or <code>String</code>,
-	 * that was set when this builder was initialized.
+	 * Return the data, always a <code>Hashtable</code> or <code>String</code>, that
+	 * was set when this builder was initialized.
 	 *
-	 * @see setInitializationData(IConfigurationElement, String, Object)
+	 * @see #setInitializationData(IConfigurationElement, String, Object)
 	 */
 	public Object getData() {
 		return data;
 	}
 
 	/**
-	 * Return the name of the child configuration element that named this
-	 * builder in its class attribute.
+	 * Return the name of the child configuration element that named this builder in
+	 * its class attribute.
 	 *
-	 * @see setInitializationData(IConfigurationElement, String, Object)
+	 * @see #setInitializationData(IConfigurationElement, String, Object)
 	 */
 	public String getName() {
 		return name;

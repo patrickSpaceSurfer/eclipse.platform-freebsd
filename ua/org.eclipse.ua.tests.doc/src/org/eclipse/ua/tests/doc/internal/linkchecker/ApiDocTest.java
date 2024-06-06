@@ -13,7 +13,7 @@
  *******************************************************************************/
 package org.eclipse.ua.tests.doc.internal.linkchecker;
 
-import static org.junit.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URI;
 import java.net.URL;
@@ -42,7 +42,7 @@ import org.eclipse.help.internal.toc.TocFileParser;
 import org.eclipse.osgi.service.resolver.BundleDescription;
 import org.eclipse.osgi.service.resolver.PlatformAdmin;
 import org.eclipse.osgi.service.resolver.State;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.FrameworkUtil;
@@ -53,7 +53,6 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
-@SuppressWarnings("restriction")
 public class ApiDocTest {
 
 	static class InternalExtensionFoundException extends SAXException {
@@ -124,8 +123,6 @@ public class ApiDocTest {
 	 *
 	 * However, the test prints potentially missing extension points / API
 	 * packages to System.out.
-	 *
-	 * @throws Exception
 	 */
 	@Test
 	public void testTopicsReference() throws Exception {
@@ -178,7 +175,7 @@ public class ApiDocTest {
 		checkExtensionPoints(extIds, problems);
 		checkPackages(packageIds, problems);
 
-		assertEquals("", problems.toString());
+		assertThat(problems).isEmpty();
 	}
 
 	private static void checkExtensionPoints(Set<String> extIds, StringBuilder problems) throws Exception {
@@ -283,7 +280,7 @@ public class ApiDocTest {
 		State state = service.getState(false);
 		for (BundleDescription bundle : state.getBundles()) {
 			bundle.getCapabilities(BundleRevision.PACKAGE_NAMESPACE)
-					.forEach((t) -> exportedPackageIds.add((String) t.getAttributes().get("osgi.wiring.package")));
+					.forEach(t -> exportedPackageIds.add((String) t.getAttributes().get("osgi.wiring.package")));
 		}
 
 		TreeSet<String> unexpectedPackageIds = new TreeSet<>(packageIds);

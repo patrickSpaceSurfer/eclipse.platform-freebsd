@@ -69,6 +69,7 @@ import org.eclipse.jface.viewers.ISelectionProvider;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerFilter;
+import org.eclipse.jface.window.Window;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.SWTError;
@@ -1068,7 +1069,7 @@ public class ReusableHelpPart implements IHelpUIConstants, IActivityManagerListe
 	}
 
 	private boolean flipPages(HelpPartPage oldPage, HelpPartPage newPage) {
-		if (newPage.canOpen() == false)
+		if (!newPage.canOpen())
 			return false;
 		if (oldPage != null) {
 			oldPage.stop();
@@ -1094,7 +1095,7 @@ public class ReusableHelpPart implements IHelpUIConstants, IActivityManagerListe
 			mform.refresh();
 		mform.getForm().getBody().layout(true);
 		mform.reflow(true);
-		if (newPage.getId().equals(IHelpUIConstants.HV_BROWSER_PAGE) == false) {
+		if (!newPage.getId().equals(IHelpUIConstants.HV_BROWSER_PAGE)) {
 			if (!history.isBlocked()) {
 				history.addEntry(new HistoryEntry(HistoryEntry.PAGE, newPage
 						.getId(), null));
@@ -1189,10 +1190,6 @@ public class ReusableHelpPart implements IHelpUIConstants, IActivityManagerListe
 
 	/**
 	 * Called to update the related topics page in response to a
-	 * @param provider
-	 * @param context
-	 * @param part
-	 * @param control
 	 * @param isExplicitRequest is true if this is the result of a direct user request such as
 	 * pressing F1 and false if it is in response to a focus change listener
 	 */
@@ -1705,7 +1702,7 @@ public class ReusableHelpPart implements IHelpUIConstants, IActivityManagerListe
 								getShowAllMessage(),
 								Messages.AskShowAll_toggleMessage, false,
 								store, PROMPT_KEY);
-				if (dialog.getReturnCode() != MessageDialogWithToggle.OK) {
+				if (dialog.getReturnCode() != Window.OK) {
 					showAllAction.setChecked(false);
 					return;
 				}

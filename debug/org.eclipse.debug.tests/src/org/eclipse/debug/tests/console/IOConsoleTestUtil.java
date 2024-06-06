@@ -13,6 +13,7 @@
  *******************************************************************************/
 package org.eclipse.debug.tests.console;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -634,8 +635,7 @@ public final class IOConsoleTestUtil {
 	public IOConsoleTestUtil verifyPartitions(final int offset, final int length, final String expectedType, final boolean allowMixedTypes, final boolean allowGaps, int minPartitionNumber) {
 		{
 			final ITypedRegion[] partitions = getPartitioner().computePartitioning(offset, length);
-			assertNotNull("Got no partitions.", partitions);
-			assertTrue("Got less partitions than expected.", partitions.length >= minPartitionNumber);
+			assertThat(partitions).as("number of partitions").hasSizeGreaterThanOrEqualTo(minPartitionNumber);
 
 			// points to offset after last partition range aka. expected start
 			// of next partition
@@ -778,7 +778,8 @@ public final class IOConsoleTestUtil {
 	}
 
 	/**
-	 * Get identifier for output {@code IOConsolePartition}s.
+	 * Get identifier for output
+	 * {@code org.eclipse.ui.internal.console.IOConsolePartition}s.
 	 *
 	 * @return output partition identifier
 	 */
@@ -788,7 +789,8 @@ public final class IOConsoleTestUtil {
 	}
 
 	/**
-	 * Get identifier for input {@code IOConsolePartition}s.
+	 * Get identifier for input
+	 * {@code org.eclipse.ui.internal.console.IOConsolePartition}s.
 	 *
 	 * @return input partition identifier
 	 */

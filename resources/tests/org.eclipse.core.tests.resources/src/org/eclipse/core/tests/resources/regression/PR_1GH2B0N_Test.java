@@ -13,39 +13,41 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.regression;
 
+import static org.eclipse.core.resources.ResourcesPlugin.getWorkspace;
+import static org.eclipse.core.tests.harness.FileSystemHelper.getTempDir;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+import static org.junit.Assert.assertTrue;
+
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectDescription;
-import org.eclipse.core.runtime.*;
-import org.eclipse.core.tests.resources.ResourceTest;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IPath;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Rule;
+import org.junit.Test;
 
-public class PR_1GH2B0N_Test extends ResourceTest {
+public class PR_1GH2B0N_Test {
 
-	public void test_1GH2B0N() {
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
+
+	@Test
+	public void test_1GH2B0N() throws CoreException {
 		IPath path = getTempDir().append("1GH2B0N");
 		IProject project = getWorkspace().getRoot().getProject("MyProject");
 		IProjectDescription description = getWorkspace().newProjectDescription("MyProject");
 		IPath projectLocation = path.append(project.getName());
+		workspaceRule.deleteOnTearDown(projectLocation);
 		description.setLocation(projectLocation);
-		try {
-			try {
-				project.create(description, getMonitor());
-			} catch (CoreException e) {
-				fail("1.0", e);
-			}
-			try {
-				project.open(getMonitor());
-			} catch (CoreException e) {
-				fail("1.1", e);
-			}
+		project.create(description, createTestMonitor());
+		project.open(createTestMonitor());
 
-			IProject project2 = getWorkspace().getRoot().getProject("MyProject2");
-			IStatus status = getWorkspace().validateProjectLocation(project2, project.getLocation().append(project2.getName()));
-			//Note this is not the original error case -
-			//since Eclipse 3.2 a project is allowed to be nested in another project
-			assertTrue("2.0", status.isOK());
-		} finally {
-			ensureDoesNotExistInWorkspace(project);
-			ensureDoesNotExistInFileSystem(projectLocation.toFile());
-		}
+		IProject project2 = getWorkspace().getRoot().getProject("MyProject2");
+		IStatus status = getWorkspace().validateProjectLocation(project2, project.getLocation().append(project2.getName()));
+		//Note this is not the original error case -
+		//since Eclipse 3.2 a project is allowed to be nested in another project
+		assertTrue("2.0", status.isOK());
 	}
+
 }

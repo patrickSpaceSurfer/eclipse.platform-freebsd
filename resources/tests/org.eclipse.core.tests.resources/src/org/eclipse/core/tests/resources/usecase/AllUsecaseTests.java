@@ -13,13 +13,16 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.usecase;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.junit.platform.suite.api.SelectClasses;
+import org.junit.platform.suite.api.Suite;
 
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
-		ConcurrencyTest.class, IFileTest.class, IFolderTest.class, IProjectTest.class,
-		IWorkspaceRunnableUseCaseTest.class
+@Suite
+@SelectClasses({ //
+		ConcurrencyTest.class, //
+		IFileTest.class, //
+		IFolderTest.class, //
+		IProjectTest.class, //
+		IWorkspaceRunnableUseCaseTest.class, //
 })
 public class AllUsecaseTests {
 }

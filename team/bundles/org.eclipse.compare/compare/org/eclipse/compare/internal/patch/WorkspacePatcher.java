@@ -140,6 +140,8 @@ public class WorkspacePatcher extends Patcher {
 								store(LineReader.createString(isPreserveLineDelimeters(), result), file, SubMonitor.convert(pm, workTicks));
 							workTicks -= WORK_UNIT;
 							break;
+						default:
+							throw new IllegalArgumentException(Integer.toString(type));
 					}
 
 					if (isGenerateRejectFile() && failed.size() > 0) {
@@ -180,7 +182,6 @@ public class WorkspacePatcher extends Patcher {
 	/**
 	 * Returns the target files of all the Diffs contained by this
 	 * DiffProject.
-	 * @param project
 	 * @return An array of IFiles that are targeted by the Diffs
 	 */
 	public IFile[] getTargetFiles(DiffProject project) {

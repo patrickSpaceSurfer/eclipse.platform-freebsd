@@ -13,25 +13,24 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.regression;
 
+import static org.junit.Assert.assertFalse;
+
 import java.io.ByteArrayInputStream;
-import org.eclipse.core.resources.*;
+import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IWorkspaceRoot;
+import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.tests.resources.ResourceTest;
+import org.eclipse.core.tests.resources.WorkspaceTestRule;
+import org.junit.Rule;
+import org.junit.Test;
 
-public class Bug_006708 extends ResourceTest {
+public class Bug_006708 {
 
-	@Override
-	protected void setUp() throws Exception {
-		super.setUp();
-		deleteProject("bug_6708");
-		deleteProject("bug_6708_2");
-	}
+	@Rule
+	public WorkspaceTestRule workspaceRule = new WorkspaceTestRule();
 
-	static void deleteProject(String name) throws CoreException {
-		IProject p = ResourcesPlugin.getWorkspace().getRoot().getProject(name);
-		p.delete(true, null);
-	}
-
+	@Test
 	public void testBug() throws CoreException {
 		IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
 		IProject sourceProj = root.getProject("bug_6708");

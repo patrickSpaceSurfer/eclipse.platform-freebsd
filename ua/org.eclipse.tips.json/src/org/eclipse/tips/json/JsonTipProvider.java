@@ -41,11 +41,11 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.Strictness;
 import com.google.gson.stream.JsonReader;
 
 /**
  * A special TipProvider that gets instantiated from a JSon file.
- *
  */
 @SuppressWarnings("restriction")
 public abstract class JsonTipProvider extends TipProvider {
@@ -75,7 +75,6 @@ public abstract class JsonTipProvider extends TipProvider {
 	 * <b>Implementation Details</b><br>
 	 * The implementation of this method in this provider will parse the json file
 	 * which was set with {@link #setJsonUrl(String)}.
-	 *
 	 */
 	@Override
 	public synchronized IStatus loadNewTips(IProgressMonitor monitor) {
@@ -112,7 +111,7 @@ public abstract class JsonTipProvider extends TipProvider {
 		try (InputStream stream = fJsonUrl.openStream();
 				InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
 			JsonReader jreader = new JsonReader(reader);
-			jreader.setLenient(true);
+			jreader.setStrictness(Strictness.LENIENT);
 			Object result = JsonParser.parseReader(jreader);
 			if (result instanceof JsonObject) {
 				return (JsonObject) result;

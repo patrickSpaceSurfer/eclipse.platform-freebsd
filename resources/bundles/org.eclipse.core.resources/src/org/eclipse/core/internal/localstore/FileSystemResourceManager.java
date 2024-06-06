@@ -111,7 +111,6 @@ public class FileSystemResourceManager implements ICoreConstants, IManager {
 	 * The workspace paths of {@link IResource#HIDDEN} project and resources
 	 * located in {@link IResource#HIDDEN} projects won't be added to the result.
 	 * </p>
-	 *
 	 */
 	protected ArrayList<IPath> allPathsForLocation(URI inputLocation) {
 		URI canonicalLocation = FileUtil.canonicalURI(inputLocation);
@@ -188,7 +187,6 @@ public class FileSystemResourceManager implements ICoreConstants, IManager {
 
 	/**
 	 * Asynchronously auto-refresh the requested resource if {@link ResourcesPlugin#PREF_LIGHTWEIGHT_AUTO_REFRESH} is enabled.
-	 * @param target
 	 */
 	private void asyncRefresh(IResource target) {
 		if (lightweightAutoRefreshEnabled) {
@@ -662,9 +660,14 @@ public class FileSystemResourceManager implements ICoreConstants, IManager {
 	 * @param location the File system location of this resource on disk
 	 * @return The file store for the provided resource
 	 */
-	private IFileStore initializeStore(IResource target, URI location) throws CoreException {
+	private IFileStore initializeStore(IResource target, URI location, boolean locationAlreadyNormalized)
+			throws CoreException {
 		ResourceInfo info = ((Resource) target).getResourceInfo(false, true);
-		setLocation(target, info, location);
+		if (locationAlreadyNormalized) {
+			setNormalizedLocation(target, info, location);
+		} else {
+			setLocation(target, info, location);
+		}
 		FileStoreRoot root = getStoreRoot(target);
 		return root.createStore(target.getFullPath(), target);
 	}
@@ -680,10 +683,8 @@ public class FileSystemResourceManager implements ICoreConstants, IManager {
 		//write the project's private description to the metadata area
 		if (hasPrivateChanges)
 			getWorkspace().getMetaArea().writePrivateDescription(target);
-		if (!hasPublicChanges)
-			return false;
 		//can't do anything if there's no description
-		if (description == null)
+		if (!hasPublicChanges || (description == null))
 			return false;
 
 		//write the model to a byte array
@@ -812,7 +813,7 @@ public class FileSystemResourceManager implements ICoreConstants, IManager {
 	}
 
 	public void link(Resource target, URI location, IFileInfo fileInfo) throws CoreException {
-		initializeStore(target, location);
+		initializeStore(target, location, false);
 		ResourceInfo info = target.getResourceInfo(false, true);
 		long lastModified = fileInfo == null ? 0 : fileInfo.getLastModified();
 		if (lastModified == 0)
@@ -932,7 +933,7 @@ public class FileSystemResourceManager implements ICoreConstants, IManager {
 			projectLocation = URIUtil.toURI(getProjectDefaultLocation(target));
 		}
 		IFile descFile = target.getFile(IProjectDescription.DESCRIPTION_FILE_NAME);
-		IFileStore projectStore = initializeStore(target, projectLocation);
+		IFileStore projectStore = initializeStore(target, projectLocation, true);
 		IFileStore descriptionStore = descFile.exists() ? getStore(descFile) : projectStore.getChild(IProjectDescription.DESCRIPTION_FILE_NAME);
 		ProjectDescription description = null;
 		//hold onto any exceptions until after sync info is updated, then throw it
@@ -1093,9 +1094,13 @@ public class FileSystemResourceManager implements ICoreConstants, IManager {
 	 * @param location the new storage location
 	 */
 	public void setLocation(IResource target, ResourceInfo info, URI location) {
+		// Normalize case as it exists on the file system.
+		setNormalizedLocation(target, info, FileUtil.realURI(location));
+	}
+
+	public void setNormalizedLocation(IResource target, ResourceInfo info, URI location) {
 		FileStoreRoot oldRoot = info.getFileStoreRoot();
 		if (location != null) {
-			location = FileUtil.realURI(location); // Normalize case as it exists on the file system.
 			info.setFileStoreRoot(new FileStoreRoot(location, target.getFullPath()));
 		} else {
 			//project is in default location so clear the store root
@@ -1148,21 +1153,58 @@ public class FileSystemResourceManager implements ICoreConstants, IManager {
 	}
 
 	/**
-	 * The target must exist in the workspace. The content InputStream is
-	 * closed even if the method fails. If the force flag is false we only write
-	 * the file if it does not exist or if it is already local and the timestamp
-	 * has NOT changed since last synchronization, otherwise a CoreException
-	 * is thrown.
+	 * The target must exist in the workspace and must remain existing throughout
+	 * the execution of this method. The {@code content} {@link InputStream} is
+	 * closed even if the method fails. If the {@link IResource#FORCE} flag is not
+	 * set in {@code updateFlags}, we only write the file if it does not exist or if
+	 * it is already local and the timestamp has <b>not</b> changed since last
+	 * synchronization, otherwise a {@link CoreException} is thrown.
+	 *
+	 * @param target      the file to write to
+	 * @param content     a stream with the contents to write to {@code target}
+	 * @param fileInfo    the info object for the {@code target} file
+	 * @param updateFlags update flags as defined in {@link IResource}
+	 * @param append      whether the {@code content} stream shall be appended to
+	 *                    the existing contents of {@code target}
+	 * @param monitor     the progress monitor to report to
+	 *
+	 * @throws CoreException in any of the following cases:
+	 *                       <ul>
+	 *                       <li>the given {@code target} does not exist or was
+	 *                       removed from the workspace concurrently
+	 *                       <li>writing the stream to {@code target} fails
+	 *                       <li>the {@link IResource#FORCE} flag is set in
+	 *                       {@code updateFlags}, {@code append} is {@code true},
+	 *                       and the file is not local or does not exist</li>
+	 *                       <li>the {@link IResource#FORCE} flag is not set in
+	 *                       {@code updateFlags} and
+	 *                       <ul>
+	 *                       <li>{@code target} is local and has been modified since
+	 *                       last synchronization</li>
+	 *                       <li>{@code target} is not local but exists or
+	 *                       {@code append} is {code true}</li>
+	 *                       </ul>
+	 *                       </ul>
+	 *
+	 * @see IResource#FORCE
+	 * @see IResource#KEEP_HISTORY
 	 */
 	public void write(IFile target, InputStream content, IFileInfo fileInfo, int updateFlags, boolean append, IProgressMonitor monitor) throws CoreException {
 		SubMonitor subMonitor = SubMonitor.convert(monitor, 4);
-		try {
+		try (content) {
+			Resource targetResource = (Resource) target;
 			IFileStore store = getStore(target);
 			if (fileInfo.getAttribute(EFS.ATTRIBUTE_READ_ONLY)) {
 				String message = NLS.bind(Messages.localstore_couldNotWriteReadOnly, target.getFullPath());
 				throw new ResourceException(IResourceStatus.FAILED_WRITE_LOCAL, target.getFullPath(), message, null);
 			}
 			long lastModified = fileInfo.getLastModified();
+			ResourceInfo immutableTargetResourceInfo = targetResource.getResourceInfo(true, false);
+			if (immutableTargetResourceInfo == null) {
+				// If the resource info is null, the resource does not exist in the workspace.
+				// This violates the method contract, so throw an according exception.
+				targetResource.checkExists(targetResource.getFlags(immutableTargetResourceInfo), true);
+			}
 			if (BitMask.isSet(updateFlags, IResource.FORCE)) {
 				if (append && !target.isLocal(IResource.DEPTH_ZERO) && !fileInfo.exists()) {
 					// force=true, local=false, existsInFileSystem=false
@@ -1171,12 +1213,8 @@ public class FileSystemResourceManager implements ICoreConstants, IManager {
 				}
 			} else {
 				if (target.isLocal(IResource.DEPTH_ZERO)) {
-					ResourceInfo info = ((Resource) target).getResourceInfo(true, false);
-					if (info == null) {
-						throw new IllegalStateException("No ResourceInfo for: " + target); //$NON-NLS-1$
-					}
 					// test if timestamp is the same since last synchronization
-					if (lastModified != info.getLocalSyncInfo()) {
+					if (lastModified != immutableTargetResourceInfo.getLocalSyncInfo()) {
 						asyncRefresh(target);
 						String message = NLS.bind(Messages.localstore_resourceIsOutOfSync, target.getFullPath());
 						throw new ResourceException(IResourceStatus.OUT_OF_SYNC_LOCAL, target.getFullPath(), message, null);
@@ -1235,17 +1273,19 @@ public class FileSystemResourceManager implements ICoreConstants, IManager {
 			}
 			// get the new last modified time and stash in the info
 			lastModified = store.fetchInfo().getLastModified();
-			ResourceInfo info = ((Resource) target).getResourceInfo(false, true);
-			if (info == null) {
-				// happens see Bug 571133
-				throw new IllegalStateException("No ResourceInfo for: " + target); //$NON-NLS-1$
+			ResourceInfo mutableTargetResourceInfo = targetResource.getResourceInfo(false, true);
+			if (mutableTargetResourceInfo == null) {
+				// If the resource info is null, the resource must have been concurrently
+				// removed from the workspace. This violates the method contract, so throw an
+				// according exception.
+				targetResource.checkExists(targetResource.getFlags(mutableTargetResourceInfo), true);
 			}
-			updateLocalSync(info, lastModified);
-			info.incrementContentId();
-			info.clear(M_CONTENT_CACHE);
-			workspace.updateModificationStamp(info);
-		} finally {
-			FileUtil.safeClose(content);
+			updateLocalSync(mutableTargetResourceInfo, lastModified);
+			mutableTargetResourceInfo.incrementContentId();
+			mutableTargetResourceInfo.clear(M_CONTENT_CACHE);
+			workspace.updateModificationStamp(mutableTargetResourceInfo);
+		} catch (IOException streamCloseIgnored) {
+			// ignore;
 		}
 	}
 

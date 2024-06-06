@@ -13,6 +13,7 @@
  *******************************************************************************/
 package org.eclipse.compare.tests;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -62,7 +63,6 @@ import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.Status;
-import org.junit.Assert;
 import org.junit.Test;
 
 import junit.framework.AssertionFailedError;
@@ -111,15 +111,15 @@ public class PatchTest {
 		IStorage patchStorage = new StringStorage("patch_hunkFilter.txt");
 		IStorage expStorage = new StringStorage("context.txt");
 		IFilePatch[] patches = ApplyPatchOperation.parsePatch(patchStorage);
-		assertEquals(1, patches.length);
+		assertThat(patches).hasSize(1);
 		IHunk[] hunks = patches[0].getHunks();
-		assertEquals(5, hunks.length);
+		assertThat(hunks).hasSize(5);
 		PatchConfiguration pc = new PatchConfiguration();
 		final IHunk toFilterOut = hunks[3];
 		pc.addHunkFilter(hunk -> hunk != toFilterOut);
 		IFilePatchResult result = patches[0].apply(expStorage, pc, new NullProgressMonitor());
 		IHunk[] rejects = result.getRejects();
-		assertEquals(2, rejects.length);
+		assertThat(rejects).hasSize(2);
 		boolean aFiltered = pc.getHunkFilters()[0].select(rejects[0]);
 		boolean bFiltered = pc.getHunkFilters()[0].select(rejects[1]);
 		assertTrue((aFiltered && !bFiltered) || (!aFiltered && bFiltered));
@@ -312,8 +312,6 @@ public class PatchTest {
 		throw new AssertionFailedError(sb.toString());
 	}
 
-	// both copy-pasted from CoreTest
-
 	private void log(String pluginID, IStatus status) {
 		ILog.of(Platform.getBundle(pluginID)).log(status);
 	}
@@ -323,15 +321,12 @@ public class PatchTest {
 	}
 
 	/**
-	 * @param patchdataUrl
 	 * @return A map with subfolder name as a key and an array of objects as a
 	 *         value. The first object in the array is another array (of Strings)
 	 *         containing file names for the test. The last value in this array can
 	 *         be <code>null</code> as testing against actual result is optional.
 	 *         The second object is an instance of <code>PatchConfiguration</code>
 	 *         class.
-	 * @throws IOException
-	 * @throws CoreException
 	 */
 	private Map<String, PatchTestConfiguration> extractNamesForJarProtocol(URL patchdataUrl)
 			throws IOException, CoreException {
@@ -470,7 +465,7 @@ public class PatchTest {
 		IStorage oldStorage = new StringStorage(old);
 		IStorage patchStorage = new StringStorage(patch);
 		IFilePatch[] patches = ApplyPatchOperation.parsePatch(patchStorage);
-		assertTrue(patches.length == 1);
+		assertThat(patches).hasSize(1);
 		IFilePatchResult result = patches[0].apply(oldStorage, new PatchConfiguration(), null);
 		assertTrue(result.hasMatches());
 		assertFalse(result.hasRejects());
@@ -491,7 +486,7 @@ public class PatchTest {
 		}
 
 		FilePatch2[] diffs = patcher.getDiffs();
-		Assert.assertEquals(diffs.length, 1);
+		assertThat(diffs).hasSize(1);
 
 		FileDiffResult diffResult = patcher.getDiffResult(diffs[0]);
 		diffResult.patch(inLines, null);
@@ -499,7 +494,7 @@ public class PatchTest {
 		LineReader expectedContents = new LineReader(PatchUtils.getReader(expt));
 		List<String> expectedLines = expectedContents.readLines();
 
-		Assert.assertArrayEquals(expectedLines.toArray(), inLines.toArray());
+		assertThat(inLines).containsExactlyElementsOf(expectedLines);
 	}
 
 	private void patchWorkspace(String[] originalFiles, String patch, String[] expectedOutcomeFiles, boolean reverse,
@@ -513,10 +508,6 @@ public class PatchTest {
 	/**
 	 * Parses a workspace patch and applies the diffs to the appropriate files
 	 *
-	 * @param msg
-	 * @param originalFiles
-	 * @param patch
-	 * @param expectedOutcomeFiles
 	 * @param patchConfiguration   The patch configuration to use. One of its
 	 *                             parameters is fuzz factor. If it equals
 	 *                             <code>-1</code> it means that the fuzz should be
@@ -526,7 +517,7 @@ public class PatchTest {
 			PatchConfiguration patchConfiguration) {
 
 		// ensure that we have the same number of input files as we have expected files
-		Assert.assertEquals(originalFiles.length, expectedOutcomeFiles.length);
+		assertThat(expectedOutcomeFiles).hasSameSizeAs(originalFiles);
 
 		// Parse the passed in patch and extract all the Diffs
 		WorkspacePatcher patcher = new WorkspacePatcher();
@@ -562,7 +553,7 @@ public class PatchTest {
 			LineReader resultReader = new LineReader(new BufferedReader(new StringReader(resultString)));
 			Object[] result = resultReader.readLines().toArray();
 
-			Assert.assertArrayEquals(msg, expected, result);
+			assertThat(result).as(msg).containsExactly(expected);
 		}
 	}
 }

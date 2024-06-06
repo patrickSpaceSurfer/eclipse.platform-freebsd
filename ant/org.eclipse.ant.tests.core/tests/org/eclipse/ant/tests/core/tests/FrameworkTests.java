@@ -7,13 +7,14 @@
  * https://www.eclipse.org/legal/epl-2.0/
  *
  * SPDX-License-Identifier: EPL-2.0
- * 
+ *
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *     Ericsson AB, Julian Enoch - Bug 465594
  *******************************************************************************/
 package org.eclipse.ant.tests.core.tests;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
@@ -44,9 +45,6 @@ public class FrameworkTests extends AbstractAntTest {
 	/**
 	 * Ensures that the deprecated means of setting the class path still works correctly Do not fix deprecations unless the deprecated methods are
 	 * being removed.
-	 * 
-	 * @throws MalformedURLException
-	 * @throws CoreException
 	 */
 	@SuppressWarnings("deprecation")
 	@Test
@@ -141,8 +139,6 @@ public class FrameworkTests extends AbstractAntTest {
 
 	/**
 	 * Regression test for running a specific target from a script that has no default target. Associated with bug 294502.
-	 * 
-	 * @throws CoreException
 	 */
 	@Test
 	public void testSpecificTargetWithNoDefaultTarget() throws CoreException {
@@ -270,13 +266,11 @@ public class FrameworkTests extends AbstractAntTest {
 			runner.setBuildFileLocation(buildFile.getLocation().toFile().toString());
 		}
 		TargetInfo[] infos = runner.getAvailableTargets();
-		assertTrue("incorrect number of targets retrieved", infos != null && infos.length == 3); //$NON-NLS-1$
+		assertThat(infos).as("number of retrieved targets").hasSize(3); //$NON-NLS-1$
 	}
 
 	/**
 	 * Tests bug 389564 for a class path entry as a url representing a remote file system location
-	 * 
-	 * @throws MalformedURLException
 	 */
 	@Test
 	public void testAntClasspathEntryFromUrl() throws MalformedURLException {

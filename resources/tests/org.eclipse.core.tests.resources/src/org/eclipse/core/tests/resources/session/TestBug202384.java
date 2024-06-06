@@ -13,48 +13,78 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.session;
 
-import junit.framework.Test;
+import static org.eclipse.core.tests.resources.ResourceTestPluginConstants.PI_RESOURCES_TESTS;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createInWorkspace;
+import static org.eclipse.core.tests.resources.ResourceTestUtil.createTestMonitor;
+import static org.junit.Assert.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.tests.resources.AutomatedResourceTests;
+import org.eclipse.core.tests.harness.session.SessionTestExtension;
 import org.eclipse.core.tests.resources.TestUtil;
-import org.eclipse.core.tests.resources.WorkspaceSessionTest;
-import org.eclipse.core.tests.session.WorkspaceSessionTestSuite;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * Test for bug 202384
  */
-public class TestBug202384 extends WorkspaceSessionTest {
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+public class TestBug202384 {
 
+	@RegisterExtension
+	static SessionTestExtension sessionTestExtension = SessionTestExtension.forPlugin(PI_RESOURCES_TESTS)
+			.withCustomization(SessionTestExtension.createCustomWorkspace()).create();
+
+	private String testName;
+
+	@BeforeEach
+	public void setUpTestName(TestInfo testInfo) {
+		testName = testInfo.getDisplayName();
+	}
+
+	@Test
+	@Order(1)
 	public void testInitializeWorkspace() throws CoreException {
 		IWorkspace workspace = ResourcesPlugin.getWorkspace();
 		IProject project = workspace.getRoot().getProject("project");
-		ensureExistsInWorkspace(project, true);
-		project.setDefaultCharset("UTF-8", getMonitor());
-		assertEquals("2.0", "UTF-8", project.getDefaultCharset(false));
-		project.close(getMonitor());
-		workspace.save(true, getMonitor());
+		createInWorkspace(project);
+		project.setDefaultCharset("UTF-8", createTestMonitor());
+		assertEquals("UTF-8", project.getDefaultCharset(false));
+		project.close(createTestMonitor());
+		workspace.save(true, createTestMonitor());
 	}
 
+	@Test
+	@Order(2)
 	public void testStartWithClosedProject() throws CoreException {
 		IWorkspace workspace = ResourcesPlugin.getWorkspace();
 		IProject project = workspace.getRoot().getProject("project");
-		assertFalse("1.0", project.isOpen());
+		assertFalse(project.isOpen());
 		// project is closed so it is not possible to read correct encoding
-		assertNull("2.0", project.getDefaultCharset(false));
+		assertNull(project.getDefaultCharset(false));
 		// opening the project should initialize ProjectPreferences
-		project.open(getMonitor());
+		project.open(createTestMonitor());
 		// correct values should be available after initialization
-		assertEquals("5.0", "UTF-8", project.getDefaultCharset(false));
-		workspace.save(true, getMonitor());
+		assertEquals("UTF-8", project.getDefaultCharset(false));
+		workspace.save(true, createTestMonitor());
 	}
 
+	@Test
+	@Order(3)
 	public void testStartWithOpenProject() throws CoreException {
 		IWorkspace workspace = ResourcesPlugin.getWorkspace();
 		IProject project = workspace.getRoot().getProject("project");
-		assertTrue("1.0", project.isOpen());
+		assertTrue(project.isOpen());
 		// correct values should be available if ProjectPreferences got
 		// initialized upon creation
 		String expectedEncoding = "UTF-8";
@@ -63,14 +93,11 @@ public class TestBug202384 extends WorkspaceSessionTest {
 		long start = System.currentTimeMillis();
 		while (!expectedEncoding.equals(project.getDefaultCharset(false))
 				&& System.currentTimeMillis() - start < timeout) {
-			TestUtil.dumpRunnigOrWaitingJobs(getName());
-			TestUtil.waitForJobs(getName(), 500, 1000);
+			TestUtil.dumpRunnigOrWaitingJobs(testName);
+			TestUtil.waitForJobs(testName, 500, 1000);
 		}
-		assertEquals("2.0", expectedEncoding, project.getDefaultCharset(false));
-		workspace.save(true, getMonitor());
+		assertEquals(expectedEncoding, project.getDefaultCharset(false));
+		workspace.save(true, createTestMonitor());
 	}
 
-	public static Test suite() {
-		return new WorkspaceSessionTestSuite(AutomatedResourceTests.PI_RESOURCES_TESTS, TestBug202384.class);
-	}
 }

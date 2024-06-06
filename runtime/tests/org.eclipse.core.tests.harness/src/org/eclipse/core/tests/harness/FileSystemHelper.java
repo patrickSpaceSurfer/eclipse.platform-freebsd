@@ -13,10 +13,14 @@
  *******************************************************************************/
 package org.eclipse.core.tests.harness;
 
+import static org.eclipse.core.tests.harness.TestHarnessPlugin.PI_HARNESS;
+import static org.eclipse.core.tests.harness.TestHarnessPlugin.log;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Platform;
@@ -94,8 +98,8 @@ public class FileSystemHelper {
 			}
 		}
 		if (!file.delete()) {
-			String message = "ensureDoesNotExistInFileSystem(File) could not delete: " + file.getPath();
-			CoreTest.log(CoreTest.PI_HARNESS, new Status(IStatus.WARNING, CoreTest.PI_HARNESS, IStatus.OK, message, null));
+			String message = "FileSystemHelper#clear() could not delete: " + file.getPath();
+			log(new Status(IStatus.WARNING, PI_HARNESS, IStatus.OK, message, null));
 		}
 	}
 
@@ -123,8 +127,10 @@ public class FileSystemHelper {
 			int exitcode = process.waitFor();
 			if (exitcode != 0) {
 				// xxx wrong charset. from jdk17+ we could use Console.charset()
-				String result = new BufferedReader(new InputStreamReader(process.getErrorStream())).readLine();
-				throw new IllegalStateException("Creating symlink is unsupported: " + result);
+				try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+					String result = reader.readLine();
+					throw new IllegalStateException("Creating symlink is unsupported: " + result);
+				}
 			}
 		} catch (InterruptedException e) {
 			throw new IOException("Creating symlink failed due to interrupted exception", e);

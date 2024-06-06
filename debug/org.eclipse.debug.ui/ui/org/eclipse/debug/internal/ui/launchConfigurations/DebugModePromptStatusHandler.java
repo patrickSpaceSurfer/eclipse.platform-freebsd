@@ -50,7 +50,7 @@ public class DebugModePromptStatusHandler implements IStatusHandler {
 			}
 		}
 
-		Shell activeShell = DebugUIPlugin.getShell();
+		Shell activeShell = DebugUIPlugin.getShellForModalDialog();
 		String title = LaunchConfigurationsMessages.DebugModePromptStatusHandler_0;
 		String message = LaunchConfigurationsMessages.DebugModePromptStatusHandler_1;
 
@@ -65,9 +65,6 @@ public class DebugModePromptStatusHandler implements IStatusHandler {
 			return Boolean.TRUE; // stops the launch
 		}
 	}
-	/**
-	 * @param configuration
-	 */
 	private void relaunchInDebugMode(ILaunchConfiguration configuration) {
 		DebugUITools.launch(configuration, ILaunchManager.DEBUG_MODE);
 	}

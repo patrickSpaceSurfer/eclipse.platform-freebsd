@@ -13,10 +13,14 @@
  *******************************************************************************/
 package org.eclipse.core.tests.resources.content;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import org.eclipse.core.internal.content.LazyInputStream;
 import org.junit.Test;
 
@@ -40,18 +44,28 @@ public class LazyInputStreamTest {
 		}
 
 		@Override
-		public int getBufferSize() {
+		public long getBufferSize() {
 			return super.getBufferSize();
 		}
 
 		@Override
-		public int getMark() {
+		public void setBufferSize(long bufferSize) {
+			super.setBufferSize(bufferSize);
+		}
+
+		@Override
+		public long getMark() {
 			return super.getMark();
 		}
 
 		@Override
-		public int getOffset() {
+		public long getOffset() {
 			return super.getOffset();
+		}
+
+		@Override
+		protected void setOffset(long offset) {
+			super.setOffset(offset);
 		}
 	}
 
@@ -78,7 +92,7 @@ public class LazyInputStreamTest {
 		stream.skip(4);
 		byte[] buffer = new byte[7];
 		int read = stream.read(buffer);
-		assertEquals("1.0", buffer.length, read);
+		assertThat(buffer).hasSize(read);
 		assertEquals("1.1", DATA.substring(4, 4 + buffer.length), new String(buffer));
 		assertEquals("1.2", 11, stream.getOffset());
 		read = stream.read(buffer, 3, 4);
@@ -158,5 +172,32 @@ public class LazyInputStreamTest {
 			assertEquals("1.0." + i, VARIOUS_INTS[i], stream.read());
 		}
 		stream.close();
+	}
+
+	@Test
+	public void testEnsureAvailable_BufferSizeDoesNotOverflow() throws IOException {
+		InputStream infinitelyEmpty = new InputStream() {
+
+			@Override
+			public int read() throws IOException {
+				return 0;
+			}
+
+			@Override
+			public int read(byte[] b, int off, int len) throws IOException {
+				return len;
+			}
+		};
+
+		try (OpenLazyInputStream objectUnderTest = new OpenLazyInputStream(infinitelyEmpty, 10)) {
+			// HACK: needed to avoid filling up the RAM with 0's when calling "skip"
+			objectUnderTest.setBufferSize(Integer.MAX_VALUE);
+			objectUnderTest.setOffset(Integer.MAX_VALUE);
+
+			objectUnderTest.skip(1);
+
+			assertTrue("The buffer size suffered an Overflow", objectUnderTest.getBufferSize() > Integer.MAX_VALUE);
+		}
+
 	}
 }

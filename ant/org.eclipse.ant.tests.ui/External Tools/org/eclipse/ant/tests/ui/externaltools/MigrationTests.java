@@ -7,12 +7,13 @@
  * https://www.eclipse.org/legal/epl-2.0/
  *
  * SPDX-License-Identifier: EPL-2.0
- * 
+ *
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
 package org.eclipse.ant.tests.ui.externaltools;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
@@ -37,8 +38,6 @@ public class MigrationTests extends AbstractExternalToolTest {
 
 	/**
 	 * Tests migration of arguments from an Eclipse 2.0 Ant buildfile configuration to a current launch configuration.
-	 * 
-	 * @throws CoreException
 	 */
 	@Test
 	public void test20AntMigration() throws CoreException {
@@ -52,9 +51,7 @@ public class MigrationTests extends AbstractExternalToolTest {
 		assertEquals("refresh scope", config.getAttribute(RefreshTab.ATTR_REFRESH_SCOPE, "")); //$NON-NLS-1$ //$NON-NLS-2$
 		String[] targets = AntLaunchingUtil.getTargetNames(config);
 		assertNotNull("No targets found", targets); //$NON-NLS-1$
-		assertEquals("Wrong number of targets", 2, targets.length); //$NON-NLS-1$
-		assertEquals("target1", targets[0]); //$NON-NLS-1$
-		assertEquals("target2", targets[1]); //$NON-NLS-1$
+		assertThat(targets).containsExactly("target1", "target2"); //$NON-NLS-1$ //$NON-NLS-2$
 		assertEquals(true, config.getAttribute(DebugPlugin.ATTR_CAPTURE_OUTPUT, false));
 		assertEquals(true, config.getAttribute(IDebugUIConstants.ATTR_LAUNCH_IN_BACKGROUND, false));
 		assertEquals("build kinds", config.getAttribute(IExternalToolConstants.ATTR_RUN_BUILD_KINDS, "")); //$NON-NLS-1$ //$NON-NLS-2$
@@ -64,8 +61,6 @@ public class MigrationTests extends AbstractExternalToolTest {
 
 	/**
 	 * Tests migration of arguments from an Eclipse 2.0 Ant buildfile configuration to a current launch configuration.
-	 * 
-	 * @throws CoreException
 	 */
 	@Test
 	public void test20ProgramMigration() throws CoreException {
@@ -84,8 +79,6 @@ public class MigrationTests extends AbstractExternalToolTest {
 
 	/**
 	 * Tests migration of arguments from an Eclipse 2.1 Ant buildfile configuration to a current launch configuration.
-	 * 
-	 * @throws CoreException
 	 */
 	@Test
 	public void test21AntMigration() throws CoreException {
@@ -106,15 +99,11 @@ public class MigrationTests extends AbstractExternalToolTest {
 		assertEquals("build kinds", config.getAttribute(IExternalToolConstants.ATTR_RUN_BUILD_KINDS, "")); //$NON-NLS-1$ //$NON-NLS-2$
 		assertEquals("arg1 arg2", config.getAttribute(IExternalToolConstants.ATTR_TOOL_ARGUMENTS, "")); //$NON-NLS-1$ //$NON-NLS-2$
 		String[] targets = AntLaunchingUtil.getTargetNames(config);
-		assertEquals("Wrong number of targets", 2, targets.length); //$NON-NLS-1$
-		assertEquals("target1", targets[0]); //$NON-NLS-1$
-		assertEquals("target2", targets[1]); //$NON-NLS-1$
+		assertThat(targets).containsExactly("target1", "target2"); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 
 	/**
 	 * Tests migration of arguments from an Eclipse 2.1 program configuration to a current launch configuration.
-	 * 
-	 * @throws CoreException
 	 */
 	@Test
 	public void test21ProgramMigration() throws CoreException {

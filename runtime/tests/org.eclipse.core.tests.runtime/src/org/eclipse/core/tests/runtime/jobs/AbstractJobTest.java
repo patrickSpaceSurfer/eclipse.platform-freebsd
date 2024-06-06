@@ -14,54 +14,25 @@
  *******************************************************************************/
 package org.eclipse.core.tests.runtime.jobs;
 
-import java.io.*;
-import junit.framework.TestCase;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.Assert.assertEquals;
+
+import java.time.Duration;
 import org.eclipse.core.internal.jobs.JobListeners;
 import org.eclipse.core.internal.jobs.JobManager;
-import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.jobs.IJobManager;
 import org.eclipse.core.runtime.jobs.Job;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 
 /**
  * Common superclass for all tests of the org.eclipse.core.runtime.jobs API. Provides
  * convenience methods useful for testing jobs.
  */
 @SuppressWarnings("restriction")
-public class AbstractJobTest extends TestCase {
-	public AbstractJobTest() {
-		super("");
-	}
-
-	public AbstractJobTest(String name) {
-		super(name);
-	}
-
-	/**
-	 * Fails the test due to the given exception.
-	 * @param message
-	 * @param e
-	 */
-	public void fail(String message, Throwable e) {
-		// If the exception is a CoreException with a multistatus
-		// then print out the multistatus so we can see all the info.
-		if (e instanceof CoreException) {
-			IStatus status = ((CoreException) e).getStatus();
-			if (status.getChildren().length > 0) {
-				write(status, 0);
-			}
-		}
-		fail(message + ": " + e);
-	}
-
-	protected void indent(OutputStream output, int indent) {
-		for (int i = 0; i < indent; i++) {
-			try {
-				output.write("\t".getBytes());
-			} catch (IOException e) {
-				//ignore
-			}
-		}
-	}
+public class AbstractJobTest  {
+	protected IJobManager manager;
+	private FussyProgressProvider progressProvider;
 
 	protected void sleep(long duration) {
 		try {
@@ -71,45 +42,19 @@ public class AbstractJobTest extends TestCase {
 		}
 	}
 
-	protected void write(IStatus status, int indent) {
-		PrintStream output = System.out;
-		indent(output, indent);
-		output.println("Severity: " + status.getSeverity());
-
-		indent(output, indent);
-		output.println("Plugin ID: " + status.getPlugin());
-
-		indent(output, indent);
-		output.println("Code: " + status.getCode());
-
-		indent(output, indent);
-		output.println("Message: " + status.getMessage());
-
-		if (status.isMultiStatus()) {
-			IStatus[] children = status.getChildren();
-			for (IStatus element : children) {
-				write(element, indent + 1);
-			}
-		}
-	}
-
 	/**
 	 * Ensures job completes within the given time.
-	 * @param job
-	 * @param waitTime time in milliseconds
 	 */
-	protected void waitForCompletion(Job job, int waitTime) {
-		int i = 0;
-		int tickLength = 1;
-		int ticks = waitTime / tickLength;
-		long start = now();
-		while (job.getState() != Job.NONE && now() - start < waitTime) {
-			sleep(tickLength);
-			// sanity test to avoid hanging tests
-			if (i++ > ticks && now() - start > waitTime) {
-				dumpState();
-				assertTrue("Timeout waiting for job to complete", false);
-			}
+	protected void waitForCompletion(Job job, Duration timeoutDuration) {
+		Duration startTime = Duration.ofMillis(now());
+		Duration timeout = startTime.plus(timeoutDuration);
+		while (job.getState() != Job.NONE && !timeout.minusMillis(now()).isNegative()) {
+			Thread.yield();
+		}
+		int finalJobState = job.getState();
+		if (finalJobState != Job.NONE) {
+			dumpState();
+			assertThat(finalJobState).as("timeout waiting for job to complete").isEqualTo(Job.NONE);
 		}
 	}
 
@@ -117,7 +62,7 @@ public class AbstractJobTest extends TestCase {
 	 * Ensures given job completes within a second.
 	 */
 	protected void waitForCompletion(Job job) {
-		waitForCompletion(job, 1000);
+		waitForCompletion(job, Duration.ofSeconds(1));
 	}
 
 	/**
@@ -136,19 +81,22 @@ public class AbstractJobTest extends TestCase {
 		return ((JobManager) (Job.getJobManager())).now();
 	}
 
-	@Override
-	protected void setUp() throws Exception {
+	@BeforeEach
+	public void setProgressProvider() throws Exception {
 		assertNoTimeoutOccured();
-		super.setUp();
+		manager = Job.getJobManager();
+		progressProvider = new FussyProgressProvider();
+		manager.setProgressProvider(progressProvider);
 	}
 
-	@Override
-	protected void tearDown() throws Exception {
+	@AfterEach
+	public void resetProgressProvider() throws Exception {
+		progressProvider.sanityCheck();
+		Job.getJobManager().setProgressProvider(null);
 		assertNoTimeoutOccured();
-		super.tearDown();
 	}
 
-	public static void assertNoTimeoutOccured() throws Exception {
+	protected final void assertNoTimeoutOccured() throws Exception {
 		int jobListenerTimeout = JobListeners.getJobListenerTimeout();
 		JobListeners.resetJobListenerTimeout();
 		int defaultTimeout = JobListeners.getJobListenerTimeout();
