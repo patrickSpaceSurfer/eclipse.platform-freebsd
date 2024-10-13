@@ -17,9 +17,30 @@
     <version>4.33.0-SNAPSHOT</version>
     <relativePath>../../</relativePath>
   </parent>
-  <artifactId>org.eclipse.core.filesystem.linux.x86_64</artifactId>
+  <artifactId>org.eclipse.core.filesystem.freebsd.amd64</artifactId>
   <version>1.2.400-SNAPSHOT</version>
   <packaging>eclipse-plugin</packaging>
+
+  <build>
+    <plugins>
+      <!-- tycho is not able to automatically determine os/ws/arch of this bundle -->
+      <plugin>
+        <groupId>org.eclipse.tycho</groupId>
+        <artifactId>target-platform-configuration</artifactId>
+        <version>${tycho.version}</version>
+        <configuration>
+          <resolver>p2</resolver>
+          <environments>
+            <environment>
+              <os>freebsd</os>
+              <ws>gtk</ws>
+              <arch>amd64</arch>
+            </environment>
+          </environments>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 
   <profiles>
     <profile>
@@ -28,7 +49,7 @@
         <property>
           <!-- This has to be hardcoded. Profiles are not allowed to use pom defined properties :-( -->
           <name>native</name>
-          <value>gtk.linux.x86_64</value>
+          <value>gtk.freebsd.amd64</value>
         </property>
       </activation>
       <build>
@@ -41,10 +62,10 @@
                 <phase>process-resources</phase>
                 <configuration>
                   <target>
-                    <exec executable="make" newenvironment="false" dir="../org.eclipse.core.filesystem/natives/unix/linux/"/>
-           <mkdir dir="os/linux/x86_64/"/>
-           <copy todir="os/linux/x86_64/">
-           <fileset dir="../org.eclipse.core.filesystem/natives/unix/linux/">
+                    <exec executable="gmake" newenvironment="false" dir="../org.eclipse.core.filesystem/natives/unix/freebsd/"/>
+           <mkdir dir="os/freebsd/amd64/"/>
+           <copy todir="os/freebsd/amd64/">
+           <fileset dir="../org.eclipse.core.filesystem/natives/unix/freebsd/">
                <include name="libunixfile_*.so"/>
            </fileset>
            </copy>

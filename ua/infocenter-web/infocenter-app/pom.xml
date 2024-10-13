@@ -52,7 +52,7 @@
 							<target>
 								<copy todir="src/main/webapp/WEB-INF">
 									<fileset
-										dir="../infocenter-product/target/products/infocenter/linux/gtk/x86_64/infocenter"
+										dir="../infocenter-product/target/products/infocenter/freebsd/gtk/amd64/infocenter"
 										includes="**" excludes="artifacts.xml,p2/**"/>
 								</copy>
 								<copy todir="src/main/webapp/WEB-INF/lib">
